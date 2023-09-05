@@ -26,7 +26,7 @@ async def on_message(msg):
             for i in adminRoles:
                 if i not in str(msg.author.roles) and text in str(msg.content.lower()):
                     await msg.delete()
-                    await msg.author.send("Не пишите плохие слова и не отправляйте ссылки!!!")
+                    await msg.author.send("Не пишите плохие слова!!!")
 
 
 logging = True
