@@ -19,6 +19,8 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 @bot.event
 async def on_ready():
     print(f"{bot.user.name} is ready!")
+    while True:
+        continue
 
 
 @bot.event
@@ -35,7 +37,7 @@ logging = True
 logsChannel = 1148384588800987287
 
 
-@bot.slash_command()
+@bot.slash_command(description="Кикает пользователя с сервера.")
 async def kick(interaction: nextcord.Interaction, user: nextcord.Member, reason: str):
     if not interaction.user.guild_permissions.administrator:
         await interaction.response.send_message("Вы не являетесь администратором, "
@@ -48,7 +50,7 @@ async def kick(interaction: nextcord.Interaction, user: nextcord.Member, reason:
         await user.kick(reason=reason)
 
 
-@bot.slash_command()
+@bot.slash_command(description="Банит участника сервера.")
 async def ban(interaction: nextcord.Interaction, user: nextcord.Member, reason: str):
     if not interaction.user.guild_permissions.administrator:
         await interaction.response.send_message("Вы не являетесь администратором, "
@@ -61,7 +63,7 @@ async def ban(interaction: nextcord.Interaction, user: nextcord.Member, reason: 
         await user.ban(reason=reason)
 
 
-@bot.slash_command()
+@bot.slash_command(description="Не даёт человеку писать на сервере некоторое время.")
 async def mute(interaction: nextcord.Interaction, user: nextcord.Member, duration, reason: str):
     duration_sec = humanfriendly.parse_timespan(duration)
     await interaction.response.send_message(f"{user.mention} был замучен!", ephemeral=True)
@@ -72,7 +74,7 @@ async def mute(interaction: nextcord.Interaction, user: nextcord.Member, duratio
     await user.edit(timeout=nextcord.utils.utcnow()+datetime.timedelta(seconds=duration_sec))
 
 
-@bot.slash_command()
+@bot.slash_command(description="Возвращает возможность писать в чат выбранному участнику сервера.")
 async def unmute(interaction: nextcord.Interaction, user: nextcord.Member, reason: str):
     await interaction.response.send_message(f"{user.mention} был размучен!", ephemeral=True)
     if logging is True:
