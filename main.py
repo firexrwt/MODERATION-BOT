@@ -3,6 +3,8 @@ import json
 import nextcord
 from nextcord import Interaction, SlashOption
 from nextcord.ext import commands
+import datetime
+import humanfriendly
 
 file = open('config.json', 'r')
 config = json.load(file)
@@ -44,6 +46,40 @@ async def kick(interaction: nextcord.Interaction, user: nextcord.Member, reason:
             log_channel = bot.get_channel(logsChannel)
             await log_channel.send(f"{user.mention} был кикнут админом {interaction.user.mention}. Причина: {reason}")
         await user.kick(reason=reason)
+
+
+@bot.slash_command()
+async def ban(interaction: nextcord.Interaction, user: nextcord.Member, reason: str):
+    if not interaction.user.guild_permissions.administrator:
+        await interaction.response.send_message("Вы не являетесь администратором, "
+                                                "потому вы не можете использовать эту команду!", ephemeral=True)
+    else:
+        await interaction.response.send_message(f"{user.mention} был забанен!", ephemeral=True)
+        if logging is True:
+            log_channel = bot.get_channel(logsChannel)
+            await log_channel.send(f"{user.mention} был забанен админом {interaction.user.mention}. Причина: {reason}")
+        await user.ban(reason=reason)
+
+
+@bot.slash_command()
+async def mute(interaction: nextcord.Interaction, user: nextcord.Member, duration, reason: str):
+    duration_sec = humanfriendly.parse_timespan(duration)
+    await interaction.response.send_message(f"{user.mention} был замучен!", ephemeral=True)
+    if logging is True:
+        log_channel = bot.get_channel(logsChannel)
+        await log_channel.send(f"{user.mention} был замучен админом {interaction.user.mention} на {duration}."
+                               f" Причина: {reason}.")
+    await user.edit(timeout=nextcord.utils.utcnow()+datetime.timedelta(seconds=duration_sec))
+
+
+@bot.slash_command()
+async def unmute(interaction: nextcord.Interaction, user: nextcord.Member, reason: str):
+    await interaction.response.send_message(f"{user.mention} был размучен!", ephemeral=True)
+    if logging is True:
+        log_channel = bot.get_channel(logsChannel)
+        await log_channel.send(f"{user.mention} был размучен админом {interaction.user.mention}."
+                               f" Причина: {reason}.")
+    await user.edit(timeout=nextcord.utils.utcnow())
 
 
 bot.run(config['token'])
