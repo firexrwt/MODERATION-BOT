@@ -6,6 +6,8 @@ from nextcord.ext import commands
 import datetime
 import humanfriendly
 
+logging = True
+logsChannel = 1148384588800987287
 file = open('config.json', 'r')
 config = json.load(file)
 bad_words = ["пидор", "пидорасы", "хохлы", "хохол", "пидоры", "негр",
@@ -29,10 +31,10 @@ async def on_message(msg):
                 if i not in str(msg.author.roles) and text in str(msg.content.lower()):
                     await msg.delete()
                     await msg.author.send("Не пишите плохие слова!!!")
-
-
-logging = True
-logsChannel = 1148384588800987287
+                    if logging is True:
+                        log_channel = bot.get_channel(logsChannel)
+                        await log_channel.send(f"{msg.author.mention} написал плохие слова! Благо я удалил сообщение,"
+                                               f" чтобы вы его не видели :3")
 
 
 @bot.slash_command(description="Кикает пользователя с сервера.")
@@ -69,7 +71,7 @@ async def mute(interaction: nextcord.Interaction, user: nextcord.Member, duratio
         log_channel = bot.get_channel(logsChannel)
         await log_channel.send(f"{user.mention} был замучен админом {interaction.user.mention} на {duration}."
                                f" Причина: {reason}.")
-    await user.edit(timeout=nextcord.utils.utcnow()+datetime.timedelta(seconds=duration_sec))
+    await user.edit(timeout=nextcord.utils.utcnow() + datetime.timedelta(seconds=duration_sec))
 
 
 @bot.slash_command(description="Возвращает возможность писать в чат выбранному участнику сервера.")
