@@ -10,7 +10,7 @@ file = open('config.json', 'r')
 config = json.load(file)
 bad_words = ["пидор", "пидорасы", "хохлы", "хохол", "пидоры", "негр",
              "негры", "нигретосы", "нигретос", "пидорас"]
-adminRoles = ["Админ", "Модератор"]
+adminRoles = ["Админ"]
 intents = nextcord.Intents.default()
 intents = nextcord.Intents().all()
 bot = commands.Bot(command_prefix="!", intents=intents)
