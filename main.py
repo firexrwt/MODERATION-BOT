@@ -1,10 +1,10 @@
+import datetime
 import json
 
-import nextcord
-from nextcord import Interaction, SlashOption
-from nextcord.ext import commands
-import datetime
 import humanfriendly
+import nextcord
+from nextcord.ext import commands
+
 # all necessary imported libraries are written above
 
 logging = True
