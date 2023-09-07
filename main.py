@@ -24,6 +24,15 @@ async def on_ready():
 
 
 @bot.event
+async def on_member_join(member):
+    channel = bot.get_channel(909086509993459742)
+    embed = nextcord.Embed(title="Добро пожаловать!!", description=f"{member.mention} зашел на сервер!")
+    await channel.send(embed=embed)
+    role = nextcord.utils.get(member.guild.roles, name='Подписчик')
+    await member.add_roles(role)
+
+
+@bot.event
 async def on_message(msg):
     if msg.author != bot.user:
         for text in bad_words:
