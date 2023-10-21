@@ -127,14 +127,34 @@ async def unmute(interaction: nextcord.Interaction, user: nextcord.Member, reaso
                                                 "потому вы не можете использовать эту команду!", ephemeral=True)  #
         # this command sends a response, if user is not an administrator
     else:
-        await interaction.response.send_message(f"{user.mention} был размучен!", ephemeral=True)   # bot responds to
+        await interaction.response.send_message(f"{user.mention} был размучен!", ephemeral=True)  # bot responds to
         # your command
         if logging is True:  # checks, if he should save log in logging channel
-            log_channel = bot.get_channel(logsChannel)   # gets log channel id
+            log_channel = bot.get_channel(logsChannel)  # gets log channel id
             await log_channel.send(f"{user.mention} был размучен админом {interaction.user.mention}."
                                    f" Причина: {reason}.")  # sends message in the log channel
         await user.edit(timeout=nextcord.utils.utcnow())  # this command changes the mute time to the current UTC time,
     # which removes the mute
+
+
+@bot.slash_command(description="Удаляет сообщение по определенному id")
+async def delete_message(interaction: nextcord.Interaction, channel: nextcord.TextChannel, message_id, reason: str):
+    message_id = int(message_id)
+    msg = await channel.fetch_message(message_id)
+    if not interaction.user.guild_permissions.administrator:  # bot checks, if user,
+        # that tries to use a command is an administrator
+        await interaction.response.send_message("Вы не являетесь администратором, "
+                                                "потому вы не можете использовать эту команду!", ephemeral=True)  #
+        # this command sends a response, if user is not an administrator
+    else:
+        await interaction.response.send_message(f"Сообщение пользователя {msg.author.mention} было удалено!",
+                                                ephemeral=True)
+        if logging is True:  # checks, if he should save log in logging channel
+            log_channel = bot.get_channel(logsChannel)  # gets log channel id
+            await log_channel.send(f"{msg.author.mention} написал плохие слова! Благо {interaction.user.mention} "
+                                   f"удалил сообщение,"
+                                   f" чтобы вы его не видели :3 \n Причина: {reason}.")
+            await msg.delete()
 
 
 bot.run(config['token'])  # bot runs up and gets a token from config file
