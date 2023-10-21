@@ -137,7 +137,7 @@ async def unmute(interaction: nextcord.Interaction, user: nextcord.Member, reaso
     # which removes the mute
 
 
-@bot.slash_command(description="Удаляет сообщение по определенному id")
+@bot.slash_command(description="Удаляет определенное сообщение по id и выбранному каналу.")
 async def delete_message(interaction: nextcord.Interaction, channel: nextcord.TextChannel, message_id, reason: str):
     message_id = int(message_id)
     msg = await channel.fetch_message(message_id)
