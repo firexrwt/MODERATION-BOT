@@ -3,7 +3,7 @@ import json
 import sqlite3
 import humanfriendly
 import nextcord
-from nextcord.ext import commands
+from nextcord.ext import commands, tasks
 
 # all necessary imported libraries are written above
 
@@ -19,7 +19,7 @@ bad_words = ["пидор", "пидорасы", "хохлы", "хохол", "пи
 adminRoles = ["Админ"]  # list of administrative roles
 intents = nextcord.Intents().all()
 bot = commands.Bot(command_prefix="!", intents=intents)  # creates usual command prefix, just because it is required for
-# create a sqlite3 file and a database with name 'users.db' and create a table with name 'users' and columns 'id', 'username' and 'warns'
+# commands, that are not slash commands
 conn = sqlite3.connect('users.db')  # creates a connection with database
 cursor = conn.cursor()  # creates a cursor
 cursor.execute("""CREATE TABLE IF  NOT EXISTS users (
@@ -36,7 +36,8 @@ conn.commit()  # saves changes in database
 @bot.event
 async def on_ready():  # this method shows, that the bot is running: it writes a message in terminal
     print(f"{bot.user.name} is ready!")
-
+    await bot.change_presence(status=nextcord.Status.online, activity=nextcord.Activity(
+        type=nextcord.ActivityType.watching, name="за сервером")) # this command changes bot status and activity
 
 @bot.event
 async def on_member_join(
@@ -69,7 +70,9 @@ async def on_message(msg):  # this is an AutoMod function, which is created to a
                         cursor.execute(f"SELECT id FROM users WHERE id = {msg.author.id}")
                         result = cursor.fetchone()
                         if result is None:
-                            cursor.execute(f"INSERT INTO users VALUES ({msg.author.id}, '{msg.author.name}', 1)")
+                            cursor.execute(
+                                f"INSERT INTO users VALUES ({msg.author.id}, '{msg.author.name}', 1)")  # adds
+                            # user in database and gives him 1 warning
                             conn.commit()
                             await log_channel.send(f"{msg.author.mention} написал плохие слова! Благо я "
                                                    f"удалил сообщение,"
@@ -226,6 +229,5 @@ async def unban(interaction: nextcord.Interaction, user_id, reason: str):
         cursor.execute(f"DELETE FROM users WHERE id = {user_id}")
         await interaction.guild.unban(nextcord.Object(user_id), reason=reason)
         conn.commit()
-
 
 bot.run(config['token'])  # bot runs up and gets a token from config file
