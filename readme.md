@@ -27,4 +27,4 @@ pause
 - [x] Add moderation commands
 - [x] Connect bot to database
 - [ ] Connect bot to web
-- [ ] Add fun commands
+- [x] Add fun commands
