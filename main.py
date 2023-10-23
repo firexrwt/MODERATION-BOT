@@ -104,6 +104,9 @@ async def on_message(msg):  # this is an AutoMod function, which is created to a
                                                        f" чтобы вы его не видели :3 \n Причина: Плохие слова.")
 
 
+
+
+
 @bot.slash_command(description="Кикает пользователя с сервера.")  # this command is dedicated to kick user from server
 async def kick(interaction: nextcord.Interaction, user: nextcord.Member, reason: str):  # this method requires to write
     # a nickname of user and a reason of kick
@@ -359,7 +362,6 @@ async def help(interaction: nextcord.Interaction):
     embed.add_field(name="/warn", value="Выдаёт предупреждение пользователю.", inline=False)
     embed.add_field(name="/warns", value="Показывает список предупреждений пользователя.", inline=False)
     await interaction.response.send_message(embed=embed, ephemeral=True)
-
 
 
 @bot.slash_command(description="Играет с вами в подбрасывание монетки.")
