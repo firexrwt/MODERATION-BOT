@@ -12,11 +12,11 @@ This is local-based discord bot for moderation. It has some commands for moderat
     "token": "your token"
 }
 ```
-also go to [Discord Developer Portal](https://discord.com/developers/applications) and create a bot, then copy the token and paste it in ```config.json``` file
+also go to [Discord Developer Portal](https://discord.com/developers/applications) and create a bot, then copy the token and paste it in ```config.json``` file.
 
 4. Change all the values in ```main.py``` **to your own**
 
-5. 5.Create a bat file and write something like this:
+5. Create a bat file and write something like this:
 ```bat
 @echo off
 "Path where your Python.exe is stored\python.exe" "Path where bot is stored\main.py"
