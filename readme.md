@@ -9,7 +9,7 @@ This is local-based discord bot for moderation. It has some commands for moderat
 3. Create ```config.json``` file, that looks something like this:
 ```json
 {
-    "token": "your token",
+    "token": "your token"
 }
 ```
 4. Change all the values in ```main.py``` **to your own**
