@@ -5,7 +5,9 @@ This is local-based discord bot for moderation. It has some commands for moderat
 
 ## How to set up
 1. Download the code
+
 2. Install the requirements with ```pip install -r requirements.txt```
+
 3. Create ```config.json``` file, that looks something like this:
 ```json
 {
