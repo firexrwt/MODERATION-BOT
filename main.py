@@ -1,6 +1,6 @@
 import datetime
 import json
-
+import sqlite3
 import humanfriendly
 import nextcord
 from nextcord.ext import commands
@@ -15,10 +15,19 @@ file = open('config.json', 'r')  # you must create file with same name and make 
 # }
 config = json.load(file)  # this command loads config file with token
 bad_words = ["пидор", "пидорасы", "хохлы", "хохол", "пидоры",
-             "негр", "негры", "нигретосы", "нигретос", "пидорас"]  # bad words list
+             "негр", "негры", "нигретосы", "нигретос", "нигеры", "нигер", "пидорас"]  # bad words list
 adminRoles = ["Админ"]  # list of administrative roles
 intents = nextcord.Intents().all()
 bot = commands.Bot(command_prefix="!", intents=intents)  # creates usual command prefix, just because it is required for
+# create a sqlite3 file and a database with name 'users.db' and create a table with name 'users' and columns 'id', 'username' and 'warns'
+conn = sqlite3.connect('users.db')  # creates a connection with database
+cursor = conn.cursor()  # creates a cursor
+cursor.execute("""CREATE TABLE IF  NOT EXISTS users (
+    id INT,
+    username TEXT,
+    warns INT
+)""")  # creates a table with name 'users' and columns 'id', 'username' and 'warns'
+conn.commit()  # saves changes in database
 
 
 # bot to startup
@@ -53,11 +62,41 @@ async def on_message(msg):  # this is an AutoMod function, which is created to a
                 if i not in str(msg.author.roles) and text in str(msg.content.lower()):  # bot checks a word and
                     # comapares the word with words in "bad words" list in lower case
                     await msg.delete()  # deletes a message
-                    await msg.author.send("Не пишите плохие слова!!!")  # sends a private message to user
                     if logging is True:  # checks, if he should save log in logging channel
                         log_channel = bot.get_channel(logsChannel)  # gets log channel id
-                        await log_channel.send(f"{msg.author.mention} написал плохие слова! Благо я удалил сообщение,"
-                                               f" чтобы вы его не видели :3")  # sends message in the log channel
+                        # if user is not in 'users.db' database, then bot adds him there and add him a warning. If
+                        # amount of warnings is more than 3, then bot bans him
+                        cursor.execute(f"SELECT id FROM users WHERE id = {msg.author.id}")
+                        result = cursor.fetchone()
+                        if result is None:
+                            cursor.execute(f"INSERT INTO users VALUES ({msg.author.id}, '{msg.author.name}', 1)")
+                            conn.commit()
+                            await log_channel.send(f"{msg.author.mention} написал плохие слова! Благо я "
+                                                   f"удалил сообщение,"
+                                                   f" чтобы вы его не видели :3 \n Причина: Плохие слова.")
+                        else:
+                            cursor.execute(f"SELECT warns FROM users WHERE id = {msg.author.id}")
+                            result = cursor.fetchone()
+                            warns = result[0]
+                            warns += 1
+                            print(f"{msg.author.name} имеет {warns} предупреждений")
+                            cursor.execute(f"UPDATE users SET warns = {warns} WHERE id = {msg.author.id}")
+                            conn.commit()
+                            if warns >= 3:
+                                # send a message to a user, that he was banned
+                                await msg.author.send("Вы были забанены за плохие слова!")
+                                await log_channel.send(f"{msg.author.mention} написал плохие слова 3 раза! Благо я "
+                                                       f"удалил сообщение "
+                                                       f"и забанил его :3 \n Причина: Плохие слова.")
+                                await msg.author.ban(reason="Плохие слова")
+                                # delete all messages from user, that were written in the last 7 days
+                                await msg.channel.purge(limit=100, check=lambda m: m.author == msg.author,
+                                                        bulk=True)
+                            else:
+                                await msg.author.send("Не пишите плохие слова!!!")
+                                await log_channel.send(f"{msg.author.mention} написал плохие слова! Благо я "
+                                                       f"удалил сообщение,"
+                                                       f" чтобы вы его не видели :3 \n Причина: Плохие слова.")
 
 
 @bot.slash_command(description="Кикает пользователя с сервера.")  # this command is dedicated to kick user from server
@@ -88,6 +127,8 @@ async def ban(interaction: nextcord.Interaction, user: nextcord.Member, reason: 
     else:
         await interaction.response.send_message(f"{user.mention} был забанен!", ephemeral=True)  # bot responds to
         # your command
+        # send a message to a user in private messages, that he was banned with a reason
+        await user.send(f"Вы были забанены!\n Причина: {reason}")
         if logging is True:  # checks, if he should save log in logging channel
             log_channel = bot.get_channel(logsChannel)  # gets log channel id
             await log_channel.send(f"{user.mention} был забанен админом {interaction.user.mention}. "
@@ -154,7 +195,37 @@ async def delete_message(interaction: nextcord.Interaction, channel: nextcord.Te
             await log_channel.send(f"{msg.author.mention} написал плохие слова! Благо {interaction.user.mention} "
                                    f"удалил сообщение,"
                                    f" чтобы вы его не видели :3 \n Причина: {reason}.")
+
             await msg.delete()
+
+
+@bot.slash_command(description="Показывает список предупреждений пользователя.")
+async def warns(interaction: nextcord.Interaction, user: nextcord.Member):
+    if not interaction.user.guild_permissions.administrator:
+        await interaction.response.send_message("Вы не являетесь администратором, "
+                                                "потому вы не можете использовать эту команду!", ephemeral=True)
+    else:
+        cursor.execute(f"SELECT warns FROM users WHERE id = {user.id}")
+        result = cursor.fetchone()
+        warns = result[0]
+        await interaction.response.send_message(f"У пользователя {user.mention} {warns} предупреждений.",
+                                                ephemeral=True)
+
+
+@bot.slash_command(description="Разбанивает пользователя по id.")
+async def unban(interaction: nextcord.Interaction, user_id, reason: str):
+    if not interaction.user.guild_permissions.administrator:
+        await interaction.response.send_message("Вы не являетесь администратором, "
+                                                "потому вы не можете использовать эту команду!", ephemeral=True)
+    else:
+        await interaction.response.send_message(f"Пользователь с id {user_id} был разбанен!", ephemeral=True)
+        if logging is True:
+            log_channel = bot.get_channel(logsChannel)
+            await log_channel.send(f"<@{user_id}> был разбанен админом {interaction.user.mention}. "
+                                   f"Причина: {reason}")
+        cursor.execute(f"DELETE FROM users WHERE id = {user_id}")
+        await interaction.guild.unban(nextcord.Object(user_id), reason=reason)
+        conn.commit()
 
 
 bot.run(config['token'])  # bot runs up and gets a token from config file
