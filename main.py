@@ -1,9 +1,10 @@
 import datetime
 import json
 import sqlite3
+import random
 import humanfriendly
 import nextcord
-from nextcord.ext import commands, tasks
+from nextcord.ext import commands
 
 # all necessary imported libraries are written above
 
@@ -37,7 +38,8 @@ conn.commit()  # saves changes in database
 async def on_ready():  # this method shows, that the bot is running: it writes a message in terminal
     print(f"{bot.user.name} is ready!")
     await bot.change_presence(status=nextcord.Status.online, activity=nextcord.Activity(
-        type=nextcord.ActivityType.watching, name="за сервером")) # this command changes bot status and activity
+        type=nextcord.ActivityType.watching, name="за сервером"))  # this command changes bot status and activity
+
 
 @bot.event
 async def on_member_join(
@@ -211,8 +213,83 @@ async def warns(interaction: nextcord.Interaction, user: nextcord.Member):
         cursor.execute(f"SELECT warns FROM users WHERE id = {user.id}")
         result = cursor.fetchone()
         warns = result[0]
-        await interaction.response.send_message(f"У пользователя {user.mention} {warns} предупреждений.",
+        if warns is None:
+            await interaction.response.send_message(f"У пользователя {user.mention} нет предупреждений.",
+                                                    ephemeral=True)
+        elif warns == 1:
+            await interaction.response.send_message(f"У пользователя {user.mention} 1 предупреждение.",
+                                                    ephemeral=True)
+        elif warns == 2 or warns == 3 or warns == 4:
+            await interaction.response.send_message(f"У пользователя {user.mention} {warns} предупреждения.",
+                                                    ephemeral=True)
+        else:
+            await interaction.response.send_message(f"У пользователя {user.mention} {warns} предупреждений.",
+                                                    ephemeral=True)
+
+
+# write a command, that gives user a warning
+@bot.slash_command(description="Выдаёт предупреждение пользователю.")
+async def warn(interaction: nextcord.Interaction, user: nextcord.Member, reason: str):
+    if not interaction.user.guild_permissions.administrator:
+        await interaction.response.send_message("Вы не являетесь администратором, "
+                                                "потому вы не можете использовать эту команду!", ephemeral=True)
+    else:
+        await interaction.response.send_message(f"Пользователь {user.mention} получил предупреждение!",
                                                 ephemeral=True)
+        if logging is True:  # checks, if he should save log in logging channel
+            log_channel = bot.get_channel(logsChannel)  # gets log channel id
+            await log_channel.send(f"{user.mention} получил предупреждение от {interaction.user.mention}."
+                                   f" Причина: {reason}.")  # sends message in the log channel
+        cursor.execute(f"SELECT id FROM users WHERE id = {user.id}")
+        result = cursor.fetchone()
+        if result is None:
+            cursor.execute(
+                f"INSERT INTO users VALUES ({user.id}, '{user.name}', 1)")  # adds
+            # user in database and gives him 1 warning
+            conn.commit()
+        else:
+            cursor.execute(f"SELECT warns FROM users WHERE id = {user.id}")
+            result = cursor.fetchone()
+            warns = result[0]
+            warns += 1
+            print(f"{user.name} имеет {warns} предупреждений")
+            cursor.execute(f"UPDATE users SET warns = {warns} WHERE id = {user.id}")
+            conn.commit()
+
+
+# write a command, that removes all warns from user
+@bot.slash_command(description="Удаляет все предупреждения пользователя.")
+async def clear_warns(interaction: nextcord.Interaction, user: nextcord.Member, reason: str):
+    if not interaction.user.guild_permissions.administrator:
+        await interaction.response.send_message("Вы не являетесь администратором, "
+                                                "потому вы не можете использовать эту команду!", ephemeral=True)
+    else:
+        await interaction.response.send_message(f"Все предупреждения пользователя {user.mention} были удалены!",
+                                                ephemeral=True)
+        if logging is True:  # checks, if he should save log in logging channel
+            log_channel = bot.get_channel(logsChannel)  # gets log channel id
+            await log_channel.send(
+                f"Все предупреждения пользователя {user.mention} были удалены админом {interaction.user.mention}."
+                f" Причина: {reason}.")  # sends message in the log channel
+        cursor.execute(f"UPDATE users SET warns = 0 WHERE id = {user.id}")
+        conn.commit()
+
+
+# write a command, that clears all warns on a server
+@bot.slash_command(description="Удаляет все предупреждения на сервере.")
+async def clear_all_warns(interaction: nextcord.Interaction, reason: str):
+    if not interaction.user.guild_permissions.administrator:
+        await interaction.response.send_message("Вы не являетесь администратором, "
+                                                "потому вы не можете использовать эту команду!", ephemeral=True)
+    else:
+        await interaction.response.send_message(f"Все предупреждения на сервере были удалены!",
+                                                ephemeral=True)
+        if logging is True:
+            log_channel = bot.get_channel(logsChannel)
+            await log_channel.send(f"Все предупреждения на сервере были удалены админом {interaction.user.mention}."
+                                   f" Причина: {reason}.")
+        cursor.execute(f"UPDATE users SET warns = 0")
+        conn.commit()
 
 
 @bot.slash_command(description="Разбанивает пользователя по id.")
@@ -229,5 +306,67 @@ async def unban(interaction: nextcord.Interaction, user_id, reason: str):
         cursor.execute(f"DELETE FROM users WHERE id = {user_id}")
         await interaction.guild.unban(nextcord.Object(user_id), reason=reason)
         conn.commit()
+
+
+# write a slash-command with a rock-paper-scissors game with random bot choice
+@bot.slash_command(description="Играет с вами в камень-ножницы-бумага.")
+async def rps(interaction: nextcord.Interaction, choice):
+    choices = ["камень", "бумага", "ножницы"]
+    bot_choice = random.choice(choices)
+    if choice == "камень":
+        if bot_choice == "камень":
+            await interaction.response.send_message("Ничья!", ephemeral=True)
+        elif bot_choice == "бумага":
+            await interaction.response.send_message("Я выиграл!", ephemeral=True)
+        elif bot_choice == "ножницы":
+            await interaction.response.send_message("Вы выиграли!", ephemeral=True)
+    elif choice == "бумага":
+        if bot_choice == "камень":
+            await interaction.response.send_message("Вы выиграли!", ephemeral=True)
+        elif bot_choice == "бумага":
+            await interaction.response.send_message("Ничья!", ephemeral=True)
+        elif bot_choice == "ножницы":
+            await interaction.response.send_message("Я выиграл!", ephemeral=True)
+    elif choice == "ножницы":
+        if bot_choice == "камень":
+            await interaction.response.send_message("Я выиграл!", ephemeral=True)
+        elif bot_choice == "бумага":
+            await interaction.response.send_message("Вы выиграли!", ephemeral=True)
+        elif bot_choice == "ножницы":
+            await interaction.response.send_message("Ничья!", ephemeral=True)
+    else:
+        await interaction.response.send_message("Вы должны выбрать из этих вариантов: камень, бумага, ножницы",
+                                                ephemeral=True)
+
+
+# write a slash-command, that sends full list of commands in alphabetical order as an embed message
+@bot.slash_command(description="Показывает список всех команд.")
+async def help(interaction: nextcord.Interaction):
+    embed = nextcord.Embed(title="Список всех команд", description="Все команды отсортированы по алфавиту.")
+    embed.add_field(name="!ban", value="Банит участника сервера.", inline=False)
+    embed.add_field(name="!clear_all_warns", value="Удаляет все предупреждения на сервере.", inline=False)
+    embed.add_field(name="!clear_warns", value="Удаляет все предупреждения пользователя.", inline=False)
+    embed.add_field(name="!coinflip", value="Играет с вами в подбрасывание монетки.", inline=False)
+    embed.add_field(name="!delete_message", value="Удаляет определенное сообщение по id и выбранному каналу.",
+                    inline=False)
+    embed.add_field(name="!help", value="Показывает список всех команд.", inline=False)
+    embed.add_field(name="!kick", value="Кикает пользователя с сервера.", inline=False)
+    embed.add_field(name="!mute", value="Не даёт человеку писать на сервере некоторое время.", inline=False)
+    embed.add_field(name="!rps", value="Играет с вами в камень-ножницы-бумага.", inline=False)
+    embed.add_field(name="!unban", value="Разбанивает пользователя по id.", inline=False)
+    embed.add_field(name="!unmute", value="Возвращает возможность писать в чат выбранному участнику сервера.",
+                    inline=False)
+    embed.add_field(name="!warn", value="Выдаёт предупреждение пользователю.", inline=False)
+    embed.add_field(name="!warns", value="Показывает список предупреждений пользователя.", inline=False)
+    await interaction.response.send_message(embed=embed, ephemeral=True)
+
+
+
+@bot.slash_command(description="Играет с вами в подбрасывание монетки.")
+async def coinflip(interaction: nextcord.Interaction):
+    choices = ["орёл", "решка"]
+    bot_choice = random.choice(choices)
+    await interaction.response.send_message(f"Выпало: {bot_choice}", ephemeral=True)
+
 
 bot.run(config['token'])  # bot runs up and gets a token from config file
