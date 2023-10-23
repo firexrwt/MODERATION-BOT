@@ -343,21 +343,21 @@ async def rps(interaction: nextcord.Interaction, choice):
 @bot.slash_command(description="Показывает список всех команд.")
 async def help(interaction: nextcord.Interaction):
     embed = nextcord.Embed(title="Список всех команд", description="Все команды отсортированы по алфавиту.")
-    embed.add_field(name="!ban", value="Банит участника сервера.", inline=False)
-    embed.add_field(name="!clear_all_warns", value="Удаляет все предупреждения на сервере.", inline=False)
-    embed.add_field(name="!clear_warns", value="Удаляет все предупреждения пользователя.", inline=False)
-    embed.add_field(name="!coinflip", value="Играет с вами в подбрасывание монетки.", inline=False)
-    embed.add_field(name="!delete_message", value="Удаляет определенное сообщение по id и выбранному каналу.",
+    embed.add_field(name="/ban", value="Банит участника сервера.", inline=False)
+    embed.add_field(name="/clear_all_warns", value="Удаляет все предупреждения на сервере.", inline=False)
+    embed.add_field(name="/clear_warns", value="Удаляет все предупреждения пользователя.", inline=False)
+    embed.add_field(name="/coinflip", value="Играет с вами в подбрасывание монетки.", inline=False)
+    embed.add_field(name="/delete_message", value="Удаляет определенное сообщение по id и выбранному каналу.",
                     inline=False)
-    embed.add_field(name="!help", value="Показывает список всех команд.", inline=False)
-    embed.add_field(name="!kick", value="Кикает пользователя с сервера.", inline=False)
-    embed.add_field(name="!mute", value="Не даёт человеку писать на сервере некоторое время.", inline=False)
-    embed.add_field(name="!rps", value="Играет с вами в камень-ножницы-бумага.", inline=False)
-    embed.add_field(name="!unban", value="Разбанивает пользователя по id.", inline=False)
-    embed.add_field(name="!unmute", value="Возвращает возможность писать в чат выбранному участнику сервера.",
+    embed.add_field(name="/help", value="Показывает список всех команд.", inline=False)
+    embed.add_field(name="/kick", value="Кикает пользователя с сервера.", inline=False)
+    embed.add_field(name="/mute", value="Не даёт человеку писать на сервере некоторое время.", inline=False)
+    embed.add_field(name="/rps", value="Играет с вами в камень-ножницы-бумага.", inline=False)
+    embed.add_field(name="/unban", value="Разбанивает пользователя по id.", inline=False)
+    embed.add_field(name="/unmute", value="Возвращает возможность писать в чат выбранному участнику сервера.",
                     inline=False)
-    embed.add_field(name="!warn", value="Выдаёт предупреждение пользователю.", inline=False)
-    embed.add_field(name="!warns", value="Показывает список предупреждений пользователя.", inline=False)
+    embed.add_field(name="/warn", value="Выдаёт предупреждение пользователю.", inline=False)
+    embed.add_field(name="/warns", value="Показывает список предупреждений пользователя.", inline=False)
     await interaction.response.send_message(embed=embed, ephemeral=True)
 
 
