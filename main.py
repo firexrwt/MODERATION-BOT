@@ -41,6 +41,13 @@ lvl_cursor.execute("""CREATE TABLE IF  NOT EXISTS users (
     lvl INT,
     messages INT
 )""")
+# create a list of channels, where user won't be able to increase his amount of messages and lvl
+exclude_channels = [909083335064682519, 1042869059378749460, 1168564388194689116, 1057611114126524446,
+                    1078383537171996723,
+                    909094954129850418, 909198474061443153, 1155510065508401203, 1057604521888579604,
+                    1057454748611137559,
+                    909203930725093416, 909204194697809951, 1042868984950820934, 1156421256896319598,
+                    909086509993459742]
 
 
 # bot to startup
@@ -91,6 +98,7 @@ async def on_message(msg):  # this is an AutoMod function, which is created to a
                             await log_channel.send(f"{msg.author.mention} написал плохие слова! Благо я "
                                                    f"удалил сообщение,"
                                                    f" чтобы вы его не видели :3 \n Причина: Плохие слова.")
+                            break
                         else:
                             cursor.execute(f"SELECT warns FROM users WHERE id = {msg.author.id}")
                             result = cursor.fetchone()
@@ -109,42 +117,47 @@ async def on_message(msg):  # this is an AutoMod function, which is created to a
                                 # delete all messages from user, that were written in the last 7 days
                                 await msg.channel.purge(limit=100, check=lambda m: m.author == msg.author,
                                                         bulk=True)
+                                break
                             else:
                                 await msg.author.send("Не пишите плохие слова!!!")
                                 await log_channel.send(f"{msg.author.mention} написал плохие слова! Благо я "
                                                        f"удалил сообщение,"
                                                        f" чтобы вы его не видели :3 \n Причина: Плохие слова.")
+                                break
+        # check if channel, where user wrote a message, is in exclude_channels list
+        if msg.channel.id not in exclude_channels:
+            # check if a message is a slash-command
+            if msg.content.startswith("/") is False:
+                lvl_cursor.execute(f"SELECT id FROM users WHERE id = {msg.author.id}")
+                result = lvl_cursor.fetchone()
+                if result is None:
+                    lvl_cursor.execute(
+                        f"INSERT INTO users VALUES ({msg.author.id}, '{msg.author.name}', 0, 1)")
+                    lvl_db.commit()
                 else:
-                    lvl_cursor.execute(f"SELECT id FROM users WHERE id = {msg.author.id}")
+                    lvl_cursor.execute(f"SELECT messages FROM users WHERE id = {msg.author.id}")
                     result = lvl_cursor.fetchone()
-                    if result is None:
-                        lvl_cursor.execute(
-                            f"INSERT INTO users VALUES ({msg.author.id}, '{msg.author.name}', 0, 1)")
+                    messages = result[0]
+                    messages += 1
+                    print(f"{msg.author.name} написал {messages} сообщений")
+                    lvl_cursor.execute(f"UPDATE users SET messages = {messages} WHERE id = {msg.author.id}")
+                    lvl_db.commit()
+                    lvl_cursor.execute(f"SELECT lvl FROM users WHERE id = {msg.author.id}")
+                    result = lvl_cursor.fetchone()
+                    lvl = result[0]
+                    if messages >= 10 * (lvl + 1):
+                        lvl += 1
+                        lvl_logging_channel = bot.get_channel(new_lvl_channel)
+                        embed = nextcord.Embed(title="Поздравляем!", description=f"{msg.author.mention} "
+                                                                                 f"получил {lvl} уровень!")
+                        await lvl_logging_channel.send(embed=embed)
+                        lvl_cursor.execute(f"UPDATE users SET lvl = {lvl} WHERE id = {msg.author.id}")
                         lvl_db.commit()
-                    else:
-                        lvl_cursor.execute(f"SELECT messages FROM users WHERE id = {msg.author.id}")
-                        result = lvl_cursor.fetchone()
-                        messages = result[0]
-                        messages += 1
-                        print(f"{msg.author.name} написал {messages} сообщений")
-                        lvl_cursor.execute(f"UPDATE users SET messages = {messages} WHERE id = {msg.author.id}")
+                        await msg.channel.send(f"Поздравляем, {msg.author.mention}! Вы получили {lvl} уровень!")
+                        lvl_cursor.execute(f"UPDATE users SET messages = 0 WHERE id = {msg.author.id}")
                         lvl_db.commit()
-                        if messages >= 10:
-                            lvl_cursor.execute(f"SELECT lvl FROM users WHERE id = {msg.author.id}")
-                            result = lvl_cursor.fetchone()
-                            lvl = result[0]
-                            lvl += 1
-                            lvl_logging_channel = bot.get_channel(new_lvl_channel)
-                            embed = nextcord.Embed(title="Поздравляем!", description=f"{msg.author.mention} "
-                                                                                     f"получил {lvl} уровень!")
-                            await lvl_logging_channel.send(embed=embed)
-                            lvl_cursor.execute(f"UPDATE users SET lvl = {lvl} WHERE id = {msg.author.id}")
-                            lvl_db.commit()
-                            await msg.channel.send(f"Поздравляем, {msg.author.mention}! Вы получили {lvl} уровень!")
-                            lvl_cursor.execute(f"UPDATE users SET messages = 0 WHERE id = {msg.author.id}")
-                            lvl_db.commit()
-
-
+        else:
+            pass
 
 
 @bot.slash_command(description="Кикает пользователя с сервера.")  # this command is dedicated to kick user from server
@@ -406,7 +419,6 @@ async def commands(interaction: nextcord.Interaction):
     await interaction.response.send_message(embed=embed, ephemeral=True)
 
 
-
 @bot.slash_command(description="Показывает ваш уровень и количество сообщений, которые вы написали.")
 async def profile(interaction: nextcord.Interaction):
     lvl_cursor.execute(f"SELECT id FROM users WHERE id = {interaction.user.id}")
@@ -424,11 +436,10 @@ async def profile(interaction: nextcord.Interaction):
         result = lvl_cursor.fetchone()
         messages = result[0]
         embed = nextcord.Embed(title=f"Профиль {interaction.user.name}", description=f"Уровень: {lvl}\n"
-                                                                                      f"Сообщений: {messages}",
+                                                                                     f"Сообщений: {(10*lvl) + messages}",
                                color=0x00ff00)
         embed.set_thumbnail(url=interaction.user.avatar.url)
         await interaction.response.send_message(embed=embed, ephemeral=True)
-
 
 
 @bot.slash_command(description="Играет с вами в подбрасывание монетки.")
