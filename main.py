@@ -29,6 +29,18 @@ cursor.execute("""CREATE TABLE IF  NOT EXISTS users (
     warns INT
 )""")  # creates a table with name 'users' and columns 'id', 'username' and 'warns'
 conn.commit()  # saves changes in database
+# create database, where the bot will store user id, username, lvl, and total amount of messages, that he wrote. Lvl
+# will be calculated by the amount of messages, that user wrote. For example: 10 messages = 1 lvl, 20 messages = 2 lvl
+# etc.
+new_lvl_channel = 1168564388194689116
+lvl_db = sqlite3.connect('lvl.db')  # creates a connection with database
+lvl_cursor = lvl_db.cursor()  # creates a cursor
+lvl_cursor.execute("""CREATE TABLE IF  NOT EXISTS users (
+    id INT,
+    username TEXT,
+    lvl INT,
+    messages INT
+)""")
 
 
 # bot to startup
@@ -102,7 +114,35 @@ async def on_message(msg):  # this is an AutoMod function, which is created to a
                                 await log_channel.send(f"{msg.author.mention} написал плохие слова! Благо я "
                                                        f"удалил сообщение,"
                                                        f" чтобы вы его не видели :3 \n Причина: Плохие слова.")
-
+                else:
+                    lvl_cursor.execute(f"SELECT id FROM users WHERE id = {msg.author.id}")
+                    result = lvl_cursor.fetchone()
+                    if result is None:
+                        lvl_cursor.execute(
+                            f"INSERT INTO users VALUES ({msg.author.id}, '{msg.author.name}', 0, 1)")
+                        lvl_db.commit()
+                    else:
+                        lvl_cursor.execute(f"SELECT messages FROM users WHERE id = {msg.author.id}")
+                        result = lvl_cursor.fetchone()
+                        messages = result[0]
+                        messages += 1
+                        print(f"{msg.author.name} написал {messages} сообщений")
+                        lvl_cursor.execute(f"UPDATE users SET messages = {messages} WHERE id = {msg.author.id}")
+                        lvl_db.commit()
+                        if messages >= 10:
+                            lvl_cursor.execute(f"SELECT lvl FROM users WHERE id = {msg.author.id}")
+                            result = lvl_cursor.fetchone()
+                            lvl = result[0]
+                            lvl += 1
+                            lvl_logging_channel = bot.get_channel(new_lvl_channel)
+                            embed = nextcord.Embed(title="Поздравляем!", description=f"{msg.author.mention} "
+                                                                                     f"получил {lvl} уровень!")
+                            await lvl_logging_channel.send(embed=embed)
+                            lvl_cursor.execute(f"UPDATE users SET lvl = {lvl} WHERE id = {msg.author.id}")
+                            lvl_db.commit()
+                            await msg.channel.send(f"Поздравляем, {msg.author.mention}! Вы получили {lvl} уровень!")
+                            lvl_cursor.execute(f"UPDATE users SET messages = 0 WHERE id = {msg.author.id}")
+                            lvl_db.commit()
 
 
 
@@ -342,26 +382,53 @@ async def rps(interaction: nextcord.Interaction, choice):
                                                 ephemeral=True)
 
 
-# write a slash-command, that sends full list of commands in alphabetical order as an embed message
+# write a slash-command, that sends full list of slash-commands in alphabetical order as an embed message
 @bot.slash_command(description="Показывает список всех команд.")
-async def help(interaction: nextcord.Interaction):
-    embed = nextcord.Embed(title="Список всех команд", description="Все команды отсортированы по алфавиту.")
-    embed.add_field(name="/ban", value="Банит участника сервера.", inline=False)
-    embed.add_field(name="/clear_all_warns", value="Удаляет все предупреждения на сервере.", inline=False)
-    embed.add_field(name="/clear_warns", value="Удаляет все предупреждения пользователя.", inline=False)
-    embed.add_field(name="/coinflip", value="Играет с вами в подбрасывание монетки.", inline=False)
-    embed.add_field(name="/delete_message", value="Удаляет определенное сообщение по id и выбранному каналу.",
+async def commands(interaction: nextcord.Interaction):
+    embed = nextcord.Embed(title="Список всех команд", description="Все команды, которые есть на этом сервере.",
+                           color=0x00ff00)
+    embed.add_field(name="!ban", value="Банит участника сервера.", inline=False)
+    embed.add_field(name="!clear_all_warns", value="Удаляет все предупреждения на сервере.", inline=False)
+    embed.add_field(name="!clear_warns", value="Удаляет все предупреждения пользователя.", inline=False)
+    embed.add_field(name="!coinflip", value="Играет с вами в подбрасывание монетки.", inline=False)
+    embed.add_field(name="!delete_message", value="Удаляет определенное сообщение по id и выбранному каналу.",
                     inline=False)
-    embed.add_field(name="/help", value="Показывает список всех команд.", inline=False)
-    embed.add_field(name="/kick", value="Кикает пользователя с сервера.", inline=False)
-    embed.add_field(name="/mute", value="Не даёт человеку писать на сервере некоторое время.", inline=False)
-    embed.add_field(name="/rps", value="Играет с вами в камень-ножницы-бумага.", inline=False)
-    embed.add_field(name="/unban", value="Разбанивает пользователя по id.", inline=False)
-    embed.add_field(name="/unmute", value="Возвращает возможность писать в чат выбранному участнику сервера.",
+    embed.add_field(name="!kick", value="Кикает пользователя с сервера.", inline=False)
+    embed.add_field(name="!mute", value="Не даёт человеку писать на сервере некоторое время.", inline=False)
+    embed.add_field(name="!profile", value="Показывает ваш уровень и количество сообщений, которые вы написали.",
                     inline=False)
-    embed.add_field(name="/warn", value="Выдаёт предупреждение пользователю.", inline=False)
-    embed.add_field(name="/warns", value="Показывает список предупреждений пользователя.", inline=False)
+    embed.add_field(name="!rps", value="Играет с вами в камень-ножницы-бумага.", inline=False)
+    embed.add_field(name="!unban", value="Разбанивает пользователя по id.", inline=False)
+    embed.add_field(name="!unmute", value="Возвращает возможность писать в чат выбранному участнику сервера.",
+                    inline=False)
+    embed.add_field(name="!warn", value="Выдаёт предупреждение пользователю.", inline=False)
+    embed.add_field(name="!warns", value="Показывает список предупреждений пользователя.", inline=False)
     await interaction.response.send_message(embed=embed, ephemeral=True)
+
+
+
+@bot.slash_command(description="Показывает ваш уровень и количество сообщений, которые вы написали.")
+async def profile(interaction: nextcord.Interaction):
+    lvl_cursor.execute(f"SELECT id FROM users WHERE id = {interaction.user.id}")
+    result = lvl_cursor.fetchone()
+    if result is None:
+        lvl_cursor.execute(
+            f"INSERT INTO users VALUES ({interaction.user.id}, '{interaction.user.name}', 0, 0)")
+        lvl_db.commit()
+        await interaction.response.send_message("Вы ещё не написали ни одного сообщения!", ephemeral=True)
+    else:
+        lvl_cursor.execute(f"SELECT lvl FROM users WHERE id = {interaction.user.id}")
+        result = lvl_cursor.fetchone()
+        lvl = result[0]
+        lvl_cursor.execute(f"SELECT messages FROM users WHERE id = {interaction.user.id}")
+        result = lvl_cursor.fetchone()
+        messages = result[0]
+        embed = nextcord.Embed(title=f"Профиль {interaction.user.name}", description=f"Уровень: {lvl}\n"
+                                                                                      f"Сообщений: {messages}",
+                               color=0x00ff00)
+        embed.set_thumbnail(url=interaction.user.avatar.url)
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
 
 
 @bot.slash_command(description="Играет с вами в подбрасывание монетки.")
