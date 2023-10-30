@@ -6,7 +6,7 @@ import humanfriendly
 import nextcord
 from nextcord.ext import commands
 
-# all necessary imported libraries are written above
+# all necessary imported libraries are written in requirements.txt
 
 logging = True
 logsChannel = 1148384588800987287  # id of a log channel
