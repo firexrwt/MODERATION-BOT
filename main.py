@@ -1,5 +1,6 @@
 import datetime
 import json
+import math
 import sqlite3
 import random
 import humanfriendly
@@ -417,6 +418,7 @@ async def commands(interaction: nextcord.Interaction):
 
 @bot.slash_command(description="Показывает ваш уровень и количество сообщений, которые вы написали.")
 async def profile(interaction: nextcord.Interaction):
+    global lv_multiplier
     lvl_cursor.execute(f"SELECT id FROM users WHERE id = {interaction.user.id}")
     result = lvl_cursor.fetchone()
     if result is None:
@@ -428,12 +430,14 @@ async def profile(interaction: nextcord.Interaction):
         lvl_cursor.execute(f"SELECT lvl FROM users WHERE id = {interaction.user.id}")
         result = lvl_cursor.fetchone()
         lvl = result[0]
+        lv_multiplier = (lvl*(lvl+1))//2
         lvl_cursor.execute(f"SELECT messages FROM users WHERE id = {interaction.user.id}")
         result = lvl_cursor.fetchone()
         messages = result[0]
         embed = nextcord.Embed(title=f"Профиль {interaction.user.name}", description=f"Уровень: {lvl}\n"
-                                                                                     f"Всего ообщений: {(10*lvl) + messages}"
-                                                                                     f"\nСообщений до следующего уровня: "
+                                                                                     f"Всего ообщений: {(10*lv_multiplier) + messages}"
+                                                                                     f"\nСообщений до следующего "
+                                                                                     f"уровня:"
                                                                                      f"{10*(lvl+1) - messages}",
                                color=0x00ff00)
         embed.set_thumbnail(url=interaction.user.avatar.url)
