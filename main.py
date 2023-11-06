@@ -29,9 +29,6 @@ cursor.execute("""CREATE TABLE IF  NOT EXISTS users (
     warns INT
 )""")  # creates a table with name 'users' and columns 'id', 'username' and 'warns'
 conn.commit()  # saves changes in database
-# create database, where the bot will store user id, username, lvl, and total amount of messages, that he wrote. Lvl
-# will be calculated by the amount of messages, that user wrote. For example: 10 messages = 1 lvl, 20 messages = 2 lvl
-# etc.
 new_lvl_channel = 1168564388194689116
 lvl_db = sqlite3.connect('lvl.db')  # creates a connection with database
 lvl_cursor = lvl_db.cursor()  # creates a cursor
@@ -153,7 +150,6 @@ async def on_message(msg):  # this is an AutoMod function, which is created to a
                         await lvl_logging_channel.send(embed=embed)
                         lvl_cursor.execute(f"UPDATE users SET lvl = {lvl} WHERE id = {msg.author.id}")
                         lvl_db.commit()
-                        await msg.channel.send(f"Поздравляем, {msg.author.mention}! Вы получили {lvl} уровень!")
                         lvl_cursor.execute(f"UPDATE users SET messages = 0 WHERE id = {msg.author.id}")
                         lvl_db.commit()
         else:
@@ -436,7 +432,9 @@ async def profile(interaction: nextcord.Interaction):
         result = lvl_cursor.fetchone()
         messages = result[0]
         embed = nextcord.Embed(title=f"Профиль {interaction.user.name}", description=f"Уровень: {lvl}\n"
-                                                                                     f"Сообщений: {(10*lvl) + messages}",
+                                                                                     f"Всего ообщений: {(10*lvl) + messages}"
+                                                                                     f"\nСообщений до следующего уровня: "
+                                                                                     f"{10*(lvl+1) - messages}",
                                color=0x00ff00)
         embed.set_thumbnail(url=interaction.user.avatar.url)
         await interaction.response.send_message(embed=embed, ephemeral=True)
