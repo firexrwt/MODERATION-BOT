@@ -430,15 +430,15 @@ async def profile(interaction: nextcord.Interaction):
         lvl_cursor.execute(f"SELECT lvl FROM users WHERE id = {interaction.user.id}")
         result = lvl_cursor.fetchone()
         lvl = result[0]
-        lv_multiplier = sum(range(lvl + 1))
-        print(lv_multiplier)
+        lv_multiplier = (lvl*(lvl+1))//2
         lvl_cursor.execute(f"SELECT messages FROM users WHERE id = {interaction.user.id}")
         result = lvl_cursor.fetchone()
         messages = result[0]
-        embed = nextcord.Embed(title=f"Профиль {interaction.user.name}",
-                               description=f"Уровень: {lvl}\n"
-                                           f"Всего сообщений: {(10*lv_multiplier) + messages}"
-                                           f"\nСообщений до следующего уровня: {10*(lvl+1) - messages}",
+        embed = nextcord.Embed(title=f"Профиль {interaction.user.name}", description=f"Уровень: {lvl}\n"
+                                                                                     f"Всего ообщений: {(10*lv_multiplier) + messages}"
+                                                                                     f"\nСообщений до следующего "
+                                                                                     f"уровня:"
+                                                                                     f"{10*(lvl+1) - messages}",
                                color=0x00ff00)
         embed.set_thumbnail(url=interaction.user.avatar.url)
         await interaction.response.send_message(embed=embed, ephemeral=True)
