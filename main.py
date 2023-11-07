@@ -46,7 +46,7 @@ exclude_channels = [909083335064682519, 1042869059378749460, 1168564388194689116
                     1057454748611137559,
                     909203930725093416, 909204194697809951, 1042868984950820934, 1156421256896319598,
                     909086509993459742]
-
+exclude_categories = [1052532014844235816]
 
 # bot to startup
 
@@ -123,7 +123,7 @@ async def on_message(msg):  # this is an AutoMod function, which is created to a
                                                        f" чтобы вы его не видели :3 \n Причина: Плохие слова.")
                                 break
         # check if channel, where user wrote a message, is in exclude_channels list
-        if msg.channel.id not in exclude_channels:
+        if msg.channel.id not in exclude_channels or msg.channel.category.id not in exclude_categories:
             # check if a message is a slash-command
             if msg.content.startswith("/") is False:
                 lvl_cursor.execute(f"SELECT id FROM users WHERE id = {msg.author.id}")
