@@ -47,6 +47,7 @@ exclude_channels = [909083335064682519, 1042869059378749460, 1168564388194689116
                     909086509993459742]
 exclude_categories = [1052532014844235816]
 
+
 # bot to startup
 
 
@@ -279,7 +280,6 @@ async def warns(interaction: nextcord.Interaction, user: nextcord.Member):
                                                     ephemeral=True)
 
 
-# write a command, that gives user a warning
 @bot.slash_command(description="Выдаёт предупреждение пользователю.")
 async def warn(interaction: nextcord.Interaction, user: nextcord.Member, reason: str):
     if not interaction.user.guild_permissions.administrator:
@@ -309,7 +309,6 @@ async def warn(interaction: nextcord.Interaction, user: nextcord.Member, reason:
             conn.commit()
 
 
-# write a command, that removes all warns from user
 @bot.slash_command(description="Удаляет все предупреждения пользователя.")
 async def clear_warns(interaction: nextcord.Interaction, user: nextcord.Member, reason: str):
     if not interaction.user.guild_permissions.administrator:
@@ -327,7 +326,6 @@ async def clear_warns(interaction: nextcord.Interaction, user: nextcord.Member, 
         conn.commit()
 
 
-# write a command, that clears all warns on a server
 @bot.slash_command(description="Удаляет все предупреждения на сервере.")
 async def clear_all_warns(interaction: nextcord.Interaction, reason: str):
     if not interaction.user.guild_permissions.administrator:
@@ -360,7 +358,6 @@ async def unban(interaction: nextcord.Interaction, user_id, reason: str):
         conn.commit()
 
 
-# write a slash-command with a rock-paper-scissors game with random bot choice
 @bot.slash_command(description="Играет с вами в камень-ножницы-бумага.")
 async def rps(interaction: nextcord.Interaction, choice):
     choices = ["камень", "бумага", "ножницы"]
@@ -391,18 +388,20 @@ async def rps(interaction: nextcord.Interaction, choice):
                                                 ephemeral=True)
 
 
-# write a slash-command, that sends full list of slash-commands in alphabetical order as an embed message
-@bot.slash_command(description="Показывает список всех команд.")
+@bot.slash_command(description="Показывает список всех команд в алфавитном порядке.")
 async def commands(interaction: nextcord.Interaction):
-    embed = nextcord.Embed(title="Список всех команд", description="Все команды, которые есть на этом сервере.",
-                           color=0x00ff00)
+    embed = nextcord.Embed(title="Список всех команд", description="Список всех команд, которые есть на сервере.",
+                           color=0x223eff)
     embed.add_field(name="!ban", value="Банит участника сервера.", inline=False)
     embed.add_field(name="!clear_all_warns", value="Удаляет все предупреждения на сервере.", inline=False)
     embed.add_field(name="!clear_warns", value="Удаляет все предупреждения пользователя.", inline=False)
     embed.add_field(name="!coinflip", value="Играет с вами в подбрасывание монетки.", inline=False)
+    embed.add_field(name="!commands", value="Показывает список всех команд.", inline=False)
     embed.add_field(name="!delete_message", value="Удаляет определенное сообщение по id и выбранному каналу.",
                     inline=False)
     embed.add_field(name="!kick", value="Кикает пользователя с сервера.", inline=False)
+    embed.add_field(name="!leaderboard", value="Показывает таблицу лидеров по уровню и количеству сообщений с их "
+                                               "количеством сообщений", inline=False)
     embed.add_field(name="!mute", value="Не даёт человеку писать на сервере некоторое время.", inline=False)
     embed.add_field(name="!profile", value="Показывает ваш уровень и количество сообщений, которые вы написали.",
                     inline=False)
@@ -429,16 +428,17 @@ async def profile(interaction: nextcord.Interaction):
         lvl_cursor.execute(f"SELECT lvl FROM users WHERE id = {interaction.user.id}")
         result = lvl_cursor.fetchone()
         lvl = result[0]
-        lv_multiplier = (lvl*(lvl+1))//2
+        lv_multiplier = (lvl * (lvl + 1)) // 2
         lvl_cursor.execute(f"SELECT messages FROM users WHERE id = {interaction.user.id}")
         result = lvl_cursor.fetchone()
         messages = result[0]
         embed = nextcord.Embed(title=f"Профиль {interaction.user.name}", description=f"Уровень: {lvl}\n"
-                                                                                     f"Всего ообщений: {(10*lv_multiplier) + messages}"
+                                                                                     f"Всего ообщений: "
+                                                                                     f"{(10*lv_multiplier) + messages}"
                                                                                      f"\nСообщений до следующего "
-                                                                                     f"уровня:"
-                                                                                     f"{10*(lvl+1) - messages}",
-                               color=0x00ff00)
+                                                                                     f"уровня: "
+                                                                                     f"{10 * (lvl + 1) - messages}",
+                               color=0x223eff)
         embed.set_thumbnail(url=interaction.user.avatar.url)
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
@@ -448,6 +448,38 @@ async def coinflip(interaction: nextcord.Interaction):
     choices = ["орёл", "решка"]
     bot_choice = random.choice(choices)
     await interaction.response.send_message(f"Выпало: {bot_choice}", ephemeral=True)
+
+
+@bot.slash_command(description="Показывает таблицу лидеров по уромню и количеству сообщений с их количеством"
+                               " сообщений")
+async def leaderboard(interaction: nextcord.Interaction):
+    lvl_cursor.execute("SELECT * FROM users ORDER BY lvl DESC, messages DESC")
+    result = lvl_cursor.fetchall()
+    embed = nextcord.Embed(title="Таблица лидеров", description="Таблица лидеров по уровню и количеству сообщений.",
+                           color=0x223eff)
+    if len(result) < 10:
+        for i in range(len(result)):
+            lvl = result[i][2]
+            messages = result[i][3]
+            lvl_mult = (lvl * (lvl + 1)) // 2
+            messages_count = (10 * lvl_mult) + messages
+            if i == 0:
+                embed.add_field(name=f"1. 🥇 {result[i][1]}", value=f"Уровень: {result[i][2]}\n"
+                                                                   f"Количество сообщений: {messages_count}",
+                                inline=False)
+            elif i == 1:
+                embed.add_field(name=f"2. 🥈 {result[i][1]}", value=f"Уровень: {result[i][2]}\n"
+                                                                   f"Количество сообщений: {messages_count}",
+                                inline=False)
+            elif i == 2:
+                embed.add_field(name=f"3. 🥉 {result[i][1]}", value=f"Уровень: {result[i][2]}\n"
+                                                                   f"Количество сообщений: {messages_count}",
+                                inline=False)
+            else:
+                embed.add_field(name=f"{i + 1}. {result[i][1]}", value=f"Уровень: {result[i][2]}\n"
+                                                                       f"Количество сообщений: {messages_count}",
+                                inline=False)
+    await interaction.response.send_message(embed=embed, ephemeral=True)
 
 
 bot.run(config['token'])  # bot runs up and gets a token from config file
