@@ -46,6 +46,8 @@ exclude_channels = [909083335064682519, 1042869059378749460, 1168564388194689116
                     909203930725093416, 909204194697809951, 1042868984950820934, 1156421256896319598,
                     909086509993459742]
 exclude_categories = [1052532014844235816]
+lvl_roles = ["УРОВЕНЬ 60 - ЛЕГЕНДА", "УРОВЕНЬ 30 - БЫВАЛЫЙ ПОДПИСЧИК", "УРОВЕНЬ 10 - АКТИВНЫЙ ПОДПИСЧИК",
+             "УРОВЕНЬ 1 - МОЛОКОСОС"]
 
 
 # bot to startup
@@ -71,6 +73,49 @@ async def on_member_join(
     # specific role, that you choose. You can change the name of the role, that you want to give, or you can delete
     # this command, if you don't need it.
     await member.add_roles(role)  # this command adds the role in the user role-list
+
+
+@bot.event
+async def check_lvl_roles():
+    while True:
+        for member in bot.get_all_members():
+            if member.bot is False:
+                lvl_cursor.execute(f"SELECT lvl FROM users WHERE id = {member.id}")
+                result = lvl_cursor.fetchone()
+                lvl = result[0]
+                for i in lvl_roles:
+                    if i not in str(member.roles):
+                        if i == "УРОВЕНЬ 60 - ЛЕГЕНДА" and lvl >= 60:
+                            role = nextcord.utils.get(member.guild.roles, name=i)
+                            await member.add_roles(role)
+                        elif i == "УРОВЕНЬ 30 - БЫВАЛЫЙ ПОДПИСЧИК" and lvl >= 30:
+                            role = nextcord.utils.get(member.guild.roles, name=i)
+                            await member.add_roles(role)
+                        elif i == "УРОВЕНЬ 10 - АКТИВНЫЙ ПОДПИСЧИК" and lvl >= 10:
+                            role = nextcord.utils.get(member.guild.roles, name=i)
+                            await member.add_roles(role)
+                        elif i == "УРОВЕНЬ 1 - МОЛОКОСОС" and lvl >= 1:
+                            role = nextcord.utils.get(member.guild.roles, name=i)
+                            await member.add_roles(role)
+                    else:
+                        if i == "УРОВЕНЬ 60 - ЛЕГЕНДА" and lvl < 60:
+                            role = nextcord.utils.get(member.guild.roles, name=i)
+                            await member.remove_roles(role)
+                        elif i == "УРОВЕНЬ 30 - БЫВАЛЫЙ ПОДПИСЧИК" and lvl < 30:
+                            role = nextcord.utils.get(member.guild.roles, name=i)
+                            await member.remove_roles(role)
+                        elif i == "УРОВЕНЬ 10 - АКТИВНЫЙ ПОДПИСЧИК" and lvl < 10:
+                            role = nextcord.utils.get(member.guild.roles, name=i)
+                            await member.remove_roles(role)
+                        elif i == "УРОВЕНЬ 1 - МОЛОКОСОС" and lvl < 1:
+                            role = nextcord.utils.get(member.guild.roles, name=i)
+                            await member.remove_roles(role)
+            else:
+                for i in lvl_roles:
+                    if i in str(member.roles):
+                        role = nextcord.utils.get(member.guild.roles, name=i)
+                        await member.remove_roles(role)
+        await nextcord.utils.sleep_until(datetime.datetime.now() + datetime.timedelta(minutes=1))
 
 
 @bot.event
@@ -132,12 +177,14 @@ async def on_message(msg):  # this is an AutoMod function, which is created to a
                     lvl_cursor.execute(
                         f"INSERT INTO users VALUES ({msg.author.id}, '{msg.author.name}', 0, 1)")
                     lvl_db.commit()
+                    await check_lvl_roles()
                 else:
                     lvl_cursor.execute(f"SELECT messages FROM users WHERE id = {msg.author.id}")
                     result = lvl_cursor.fetchone()
                     messages = result[0]
                     messages += 1
-                    print(f"{msg.author.name} написал {messages} сообщений")
+                    print(f"{msg.author.name} написал {messages} сообщений в "
+                          f"{datetime.datetime.now().strftime('%H:%M:%S')}")
                     lvl_cursor.execute(f"UPDATE users SET messages = {messages} WHERE id = {msg.author.id}")
                     lvl_db.commit()
                     lvl_cursor.execute(f"SELECT lvl FROM users WHERE id = {msg.author.id}")
@@ -153,6 +200,7 @@ async def on_message(msg):  # this is an AutoMod function, which is created to a
                         lvl_db.commit()
                         lvl_cursor.execute(f"UPDATE users SET messages = 0 WHERE id = {msg.author.id}")
                         lvl_db.commit()
+                        await check_lvl_roles()
         else:
             pass
 
@@ -434,7 +482,7 @@ async def profile(interaction: nextcord.Interaction):
         messages = result[0]
         embed = nextcord.Embed(title=f"Профиль {interaction.user.name}", description=f"Уровень: {lvl}\n"
                                                                                      f"Всего ообщений: "
-                                                                                     f"{(10*lv_multiplier) + messages}"
+                                                                                     f"{(10 * lv_multiplier) + messages}"
                                                                                      f"\nСообщений до следующего "
                                                                                      f"уровня: "
                                                                                      f"{10 * (lvl + 1) - messages}",
@@ -459,6 +507,28 @@ async def leaderboard(interaction: nextcord.Interaction):
                            color=0x223eff)
     if len(result) < 10:
         for i in range(len(result)):
+            lvl = result[i][2]
+            messages = result[i][3]
+            lvl_mult = (lvl * (lvl + 1)) // 2
+            messages_count = (10 * lvl_mult) + messages
+            if i == 0:
+                embed.add_field(name=f"1. 🥇 {result[i][1]}", value=f"Уровень: {result[i][2]}\n"
+                                                                   f"Количество сообщений: {messages_count}",
+                                inline=False)
+            elif i == 1:
+                embed.add_field(name=f"2. 🥈 {result[i][1]}", value=f"Уровень: {result[i][2]}\n"
+                                                                   f"Количество сообщений: {messages_count}",
+                                inline=False)
+            elif i == 2:
+                embed.add_field(name=f"3. 🥉 {result[i][1]}", value=f"Уровень: {result[i][2]}\n"
+                                                                   f"Количество сообщений: {messages_count}",
+                                inline=False)
+            else:
+                embed.add_field(name=f"{i + 1}. {result[i][1]}", value=f"Уровень: {result[i][2]}\n"
+                                                                       f"Количество сообщений: {messages_count}",
+                                inline=False)
+    else:
+        for i in range(10):
             lvl = result[i][2]
             messages = result[i][3]
             lvl_mult = (lvl * (lvl + 1)) // 2
