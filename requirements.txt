@@ -1,2 +1,4 @@
 humanfriendly~=10.0
 nextcord~=2.6.0
+waitress~=2.1.2
+requests~=2.31.0

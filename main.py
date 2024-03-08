@@ -2,14 +2,17 @@ import datetime
 import json
 import sqlite3
 import random
+from twitch_notifications import checkIfLive
+
 import humanfriendly
 import nextcord
-from nextcord.ext import commands
+from nextcord.ext import commands, tasks
 
 # all necessary imported libraries are written in requirements.txt
 
 logging = True
 logsChannel = 1148384588800987287  # id of a log channel
+notif_channel = 1042869059378749460
 file = open('config.json', 'r')  # you must create file with same name and make it must look like this inside:
 # {
 #   "token": "***your token***"
@@ -48,6 +51,13 @@ exclude_channels = [909083335064682519, 1042869059378749460, 1168564388194689116
 exclude_categories = [1052532014844235816]
 lvl_roles = ["УРОВЕНЬ 60 - ЛЕГЕНДА", "УРОВЕНЬ 30 - БЫВАЛЫЙ ПОДПИСЧИК", "УРОВЕНЬ 10 - АКТИВНЫЙ ПОДПИСЧИК",
              "УРОВЕНЬ 1 - МОЛОКОСОС"]
+streamers_db = sqlite3.connect("streamers.db")
+streamers_cursor = streamers_db.cursor()
+# command creates a database with nickname of streamers and also store their status there
+streamers_cursor.execute("""CREATE TABLE IF NOT EXISTS streamers (
+    nickname TEXT,
+    status TEXT
+)""")
 
 
 # bot to startup
@@ -56,6 +66,7 @@ lvl_roles = ["УРОВЕНЬ 60 - ЛЕГЕНДА", "УРОВЕНЬ 30 - БЫВА
 @bot.event
 async def on_ready():  # this method shows, that the bot is running: it writes a message in terminal
     print(f"{bot.user.name} is ready!")
+    twitchNotifications.start()
     await bot.change_presence(status=nextcord.Status.online, activity=nextcord.Activity(
         type=nextcord.ActivityType.watching, name="за сервером"))  # this command changes bot status and activity
 
@@ -550,6 +561,84 @@ async def leaderboard(interaction: nextcord.Interaction):
                                                                        f"Количество сообщений: {messages_count}",
                                 inline=False)
     await interaction.response.send_message(embed=embed, ephemeral=True)
+
+
+@bot.slash_command(description="Добавляет стримера в список уведомлений.")
+async def add_streamer(interaction: nextcord.Interaction, streamer_nickname: str):
+    # command should add a streamer to the database
+    if not interaction.user.guild_permissions.administrator:
+        await interaction.response.send_message("Вы не являетесь администратором, "
+                                                "потому вы не можете использовать эту команду!", ephemeral=True)
+    else:
+        streamers_cursor.execute(f"SELECT nickname FROM streamers WHERE nickname = '{streamer_nickname}'")
+        result = streamers_cursor.fetchone()
+        if result is None:
+            streamers_cursor.execute(f"INSERT INTO streamers (nickname) VALUES ('{streamer_nickname}')")
+            streamers_db.commit()
+            await interaction.response.send_message(f"Стример **{streamer_nickname}** был добавлен в список уведомлений!",
+                                                   ephemeral=True)
+        else:
+            await interaction.response.send_message(f"Стример **{streamer_nickname}** уже есть в списке уведомлений!",
+                                                   ephemeral=True)
+
+@bot.slash_command(description="Удаляет стримера из списка уведомлений.")
+async def remove_streamer(interaction: nextcord.Interaction, streamer_nickname: str):
+    # command should remove a streamer from the database
+    if not interaction.user.guild_permissions.administrator:
+        await interaction.response.send_message("Вы не являетесь администратором, "
+                                                "потому вы не можете использовать эту команду!", ephemeral=True)
+    else:
+        streamers_cursor.execute(f"SELECT nickname FROM streamers WHERE nickname = '{streamer_nickname}'")
+        result = streamers_cursor.fetchone()
+        if result is not None:
+            streamers_cursor.execute(f"DELETE FROM streamers WHERE nickname = '{streamer_nickname}'")
+            streamers_db.commit()
+            await interaction.response.send_message(f"Стример **{streamer_nickname}** был удален из списка уведомлений!",
+                                                   ephemeral=True)
+        else:
+            await interaction.response.send_message(f"Стример **{streamer_nickname}** не найден в списке уведомлений!",
+                                                   ephemeral=True)
+
+@bot.slash_command(description="Показывает список всех стримеров, которые есть в списке уведомлений.")
+async def streamers(interaction: nextcord.Interaction):
+    streamers_cursor.execute("SELECT nickname FROM streamers")
+    result = streamers_cursor.fetchall()
+    embed = nextcord.Embed(title="Список стримеров", description="Список всех стримеров, которые есть в списке уведомлений.",
+                           color=0x223eff)
+    for i in range(len(result)):
+        embed.add_field(name=f"{i + 1}. {result[i][0]}", value=f"Никнейм: {result[i][0]}", inline=False)
+    await interaction.response.send_message(embed=embed, ephemeral=True)
+
+
+@tasks.loop(seconds=60)
+async def twitchNotifications():
+    # this function takes a streamer from the database and checks, if he is live
+    streamers_cursor.execute("SELECT nickname FROM streamers")
+    result = streamers_cursor.fetchall()
+    for i in result:
+        stream = checkIfLive(i[0])
+        if stream != "OFFLINE":
+            streamers_cursor.execute(f"SELECT status FROM streamers WHERE nickname = '{i[0]}'")
+            result = streamers_cursor.fetchone()
+            if result[0] == "OFFLINE" or result[0] is None:
+                streamers_cursor.execute(f"UPDATE streamers SET status = 'LIVE' WHERE nickname = '{i[0]}'")
+                if stream.game == "Just Chatting":
+                    await bot.get_channel(notif_channel).send(
+                        f"@everyone Стрим на канале {i[0]} начался! Заходи посмотреть! Пока что трындим "
+                        f"https://twitch.tv/{i[0]}")
+                    print(f"Стрим на канале {i[0]} начался! Тема: Just Chatting")
+                else:
+                    await bot.get_channel(notif_channel).send(f"@everyone Стрим на канале {i[0]} начался! "
+                                                              f"Заходи посмотреть! Играем в {stream.game} "
+                                                              f"https://twitch.tv/{i[0]}")
+                    print(f"Стрим на канале {i[0]} начался! Тема: {stream.game}")
+        else:
+            streamers_cursor.execute(f"SELECT status FROM streamers WHERE nickname = '{i[0]}'")
+            result = streamers_cursor.fetchone()
+            if result[0] == "LIVE":
+                streamers_cursor.execute(f"UPDATE streamers SET status = 'OFFLINE' WHERE nickname = '{i[0]}'")
+                await bot.get_channel(notif_channel).send(f"Стрим на канале {i[0]} закончился!")
+                print(f"Стрим на канале {i[0]} закончился!")
 
 
 bot.run(config['token'])  # bot runs up and gets a token from config file
