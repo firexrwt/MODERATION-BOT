@@ -32,3 +32,4 @@ pause
 - [x] Connect bot to database
 - [ ] Connect bot to web
 - [x] Add fun commands
+- [x] Add Twitch notification support
