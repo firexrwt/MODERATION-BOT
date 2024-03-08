@@ -449,28 +449,29 @@ async def rps(interaction: nextcord.Interaction, choice):
 
 @bot.slash_command(description="Показывает список всех команд в алфавитном порядке.")
 async def commands(interaction: nextcord.Interaction):
-    embed = nextcord.Embed(title="Список всех команд", description="Список всех команд, которые есть на сервере.",
-                           color=0x223eff)
-    embed.add_field(name="!ban", value="Банит участника сервера.", inline=False)
-    embed.add_field(name="!clear_all_warns", value="Удаляет все предупреждения на сервере.", inline=False)
-    embed.add_field(name="!clear_warns", value="Удаляет все предупреждения пользователя.", inline=False)
-    embed.add_field(name="!coinflip", value="Играет с вами в подбрасывание монетки.", inline=False)
-    embed.add_field(name="!commands", value="Показывает список всех команд.", inline=False)
-    embed.add_field(name="!delete_message", value="Удаляет определенное сообщение по id и выбранному каналу.",
-                    inline=False)
-    embed.add_field(name="!kick", value="Кикает пользователя с сервера.", inline=False)
-    embed.add_field(name="!leaderboard", value="Показывает таблицу лидеров по уровню и количеству сообщений с их "
-                                               "количеством сообщений", inline=False)
-    embed.add_field(name="!mute", value="Не даёт человеку писать на сервере некоторое время.", inline=False)
-    embed.add_field(name="!profile", value="Показывает ваш уровень и количество сообщений, которые вы написали.",
-                    inline=False)
-    embed.add_field(name="!rps", value="Играет с вами в камень-ножницы-бумага.", inline=False)
-    embed.add_field(name="!unban", value="Разбанивает пользователя по id.", inline=False)
-    embed.add_field(name="!unmute", value="Возвращает возможность писать в чат выбранному участнику сервера.",
-                    inline=False)
-    embed.add_field(name="!warn", value="Выдаёт предупреждение пользователю.", inline=False)
-    embed.add_field(name="!warns", value="Показывает список предупреждений пользователя.", inline=False)
-    await interaction.response.send_message(embed=embed, ephemeral=True)
+    embed_commands = nextcord.Embed(title="Список всех команд", description="Список всех команд в алфавитном порядке.",
+                                    color=0x223eff)
+    embed_commands.add_field(name="/add_streamer", value="Добавляет стримера в базу данных.", inline=False)
+    embed_commands.add_field(name="/ban", value="Банит участника сервера.", inline=False)
+    embed_commands.add_field(name="/clear_all_warns", value="Удаляет все предупреждения на сервере.", inline=False)
+    embed_commands.add_field(name="/clear_warns", value="Удаляет все предупреждения пользователя.", inline=False)
+    embed_commands.add_field(name="/coinflip", value="Играет с вами в подбрасывание монетки.", inline=False)
+    embed_commands.add_field(name="/delete_message", value="Удаляет определенное сообщение по id и выбранному каналу.",
+                             inline=False)
+    embed_commands.add_field(name="/kick", value="Кикает пользователя с сервера.", inline=False)
+    embed_commands.add_field(name="/leaderboard", value="Показывает таблицу лидеров по уромню и количеству сообщений с "
+                                                        "их количеством сообщений.", inline=False)
+    embed_commands.add_field(name="/mute", value="Не даёт человеку писать на сервере некоторое время.", inline=False)
+    embed_commands.add_field(name="/profile", value="Показывает ваш уровень и количество сообщений, которые вы "
+                                                    "написали.", inline=False)
+    embed_commands.add_field(name="/remove_streamer", value="Удаляет стримера из базы данных.", inline=False)
+    embed_commands.add_field(name="/rps", value="Играет с вами в камень-ножницы-бумага.", inline=False)
+    embed_commands.add_field(name="/unban", value="Разбанивает пользователя по id.", inline=False)
+    embed_commands.add_field(name="/unmute", value="Возвращает возможность писать в чат выбранному участнику сервера.",
+                             inline=False)
+    embed_commands.add_field(name="/warn", value="Выдаёт предупреждение пользователю.", inline=False)
+    embed_commands.add_field(name="/warns", value="Показывает список предупреждений пользователя.", inline=False)
+    await interaction.response.send_message(embed=embed_commands, ephemeral=True)
 
 
 @bot.slash_command(description="Показывает ваш уровень и количество сообщений, которые вы написали.")
@@ -575,11 +576,13 @@ async def add_streamer(interaction: nextcord.Interaction, streamer_nickname: str
         if result is None:
             streamers_cursor.execute(f"INSERT INTO streamers (nickname) VALUES ('{streamer_nickname}')")
             streamers_db.commit()
-            await interaction.response.send_message(f"Стример **{streamer_nickname}** был добавлен в список уведомлений!",
-                                                   ephemeral=True)
+            await interaction.response.send_message(
+                f"Стример **{streamer_nickname}** был добавлен в список уведомлений!",
+                ephemeral=True)
         else:
             await interaction.response.send_message(f"Стример **{streamer_nickname}** уже есть в списке уведомлений!",
-                                                   ephemeral=True)
+                                                    ephemeral=True)
+
 
 @bot.slash_command(description="Удаляет стримера из списка уведомлений.")
 async def remove_streamer(interaction: nextcord.Interaction, streamer_nickname: str):
@@ -593,17 +596,20 @@ async def remove_streamer(interaction: nextcord.Interaction, streamer_nickname: 
         if result is not None:
             streamers_cursor.execute(f"DELETE FROM streamers WHERE nickname = '{streamer_nickname}'")
             streamers_db.commit()
-            await interaction.response.send_message(f"Стример **{streamer_nickname}** был удален из списка уведомлений!",
-                                                   ephemeral=True)
+            await interaction.response.send_message(
+                f"Стример **{streamer_nickname}** был удален из списка уведомлений!",
+                ephemeral=True)
         else:
             await interaction.response.send_message(f"Стример **{streamer_nickname}** не найден в списке уведомлений!",
-                                                   ephemeral=True)
+                                                    ephemeral=True)
+
 
 @bot.slash_command(description="Показывает список всех стримеров, которые есть в списке уведомлений.")
 async def streamers(interaction: nextcord.Interaction):
     streamers_cursor.execute("SELECT nickname FROM streamers")
     result = streamers_cursor.fetchall()
-    embed = nextcord.Embed(title="Список стримеров", description="Список всех стримеров, которые есть в списке уведомлений.",
+    embed = nextcord.Embed(title="Список стримеров",
+                           description="Список всех стримеров, которые есть в списке уведомлений.",
                            color=0x223eff)
     for i in range(len(result)):
         embed.add_field(name=f"{i + 1}. {result[i][0]}", value=f"Никнейм: {result[i][0]}", inline=False)
