@@ -18,8 +18,6 @@ file = open('config.json', 'r')  # you must create file with same name and make 
 #   "token": "***your token***"
 # }
 config = json.load(file)  # this command loads config file with token
-bad_words = ["пидор", "пидорасы", "хохлы", "хохол", "пидоры",
-             "негр", "негры", "нигретосы", "нигретос", "нигеры", "нигер", "пидорас"]  # bad words list
 adminRoles = ["Админ"]  # list of administrative roles
 intents = nextcord.Intents().all()
 bot = commands.Bot(command_prefix="!", intents=intents)  # creates usual command prefix, just because it is required for
@@ -41,13 +39,19 @@ lvl_cursor.execute("""CREATE TABLE IF  NOT EXISTS users (
     lvl INT,
     messages INT
 )""")
+bad_words_db = sqlite3.connect('bad_words.db')
+bad_words_cursor = bad_words_db.cursor()
+bad_words_cursor.execute("""CREATE TABLE IF NOT EXISTS bad_words (
+    id INT,
+    word TEXT
+)""")
 # create a list of channels, where user won't be able to increase his amount of messages and lvl
 exclude_channels = [909083335064682519, 1042869059378749460, 1168564388194689116, 1057611114126524446,
                     1078383537171996723,
                     909094954129850418, 909198474061443153, 1155510065508401203, 1057604521888579604,
                     1057454748611137559,
                     909203930725093416, 909204194697809951, 1042868984950820934, 1156421256896319598,
-                    909086509993459742]
+                    909086509993459742, 909089711501504532]
 exclude_categories = [1052532014844235816]
 lvl_roles = ["УРОВЕНЬ 60 - ЛЕГЕНДА", "УРОВЕНЬ 30 - БЫВАЛЫЙ ПОДПИСЧИК", "УРОВЕНЬ 10 - АКТИВНЫЙ ПОДПИСЧИК",
              "УРОВЕНЬ 1 - МОЛОКОСОС"]
@@ -131,9 +135,11 @@ async def check_lvl_roles():
 
 @bot.event
 async def on_message(msg):  # this is an AutoMod function, which is created to automaticaly moderate the chat.
+    bad_words_cursor.execute("SELECT word FROM bad_words")
+    bad_words_list = [i[0] for i in bad_words_cursor.fetchall()]
     # This function doesn't linked to a specific channel, this moderates the WHOLE server.
     if msg.author != bot.user:  # checks, if user isn't a bot.
-        for text in bad_words:  # bot chooses a word from a "bad word" list
+        for text in bad_words_list:  # bot chooses a word from a "bad word" list
             for i in adminRoles:  # bot chooses an administrative role from a list
                 if i not in str(msg.author.roles) and text in str(msg.content.lower()):  # bot checks a word and
                     # comapares the word with words in "bad words" list in lower case
@@ -447,11 +453,56 @@ async def rps(interaction: nextcord.Interaction, choice):
                                                 ephemeral=True)
 
 
+@bot.slash_command(description="Добавляет плохое слово(плохие слова) в базу данных.")
+async def add_bad_word(interaction: nextcord.Interaction, word: str):
+    # эта команда добавляет плохое слово в базу данных. Она требует ввести слово, которое вы хотите добавить
+    # если администратов ввел текст с запятыми, то бот разделит текст на слова и добавит их в базу данных
+    if not interaction.user.guild_permissions.administrator:
+        await interaction.response.send_message("Вы не являетесь администратором, "
+                                                "потому вы не можете использовать эту команду!", ephemeral=True)
+    else:
+        if "," in word:
+            words = word.split(", ")
+            for i in words:
+                bad_words_cursor.execute(f"INSERT INTO bad_words VALUES ({random.randint(1, 100000)}, '{i}')")
+                bad_words_db.commit()
+            await interaction.response.send_message(f"Слова {words} были добавлены в базу данных!", ephemeral=True)
+        else:
+            bad_words_cursor.execute(f"INSERT INTO bad_words VALUES ({random.randint(1, 100000)}, '{word}')")
+            bad_words_db.commit()
+            await interaction.response.send_message(f"Слово {word} было добавлено в базу данных!", ephemeral=True)
+
+
+@bot.slash_command(description="Удаляет плохое слово из базы данных.")
+async def remove_bad_word(interaction: nextcord.Interaction, word: str):
+    if not interaction.user.guild_permissions.administrator:
+        await interaction.response.send_message("Вы не являетесь администратором, "
+                                                "потому вы не можете использовать эту команду!", ephemeral=True)
+    else:
+        bad_words_cursor.execute(f"DELETE FROM bad_words WHERE word = '{word}'")
+        bad_words_db.commit()
+        await interaction.response.send_message(f"Слово {word} было удалено из базы данных!", ephemeral=True)
+
+
+@bot.slash_command(description="Показывает список всех плохих слов.")
+async def bad_words(interaction: nextcord.Interaction):
+    bad_words_cursor.execute("SELECT word FROM bad_words")
+    bad_words = bad_words_cursor.fetchall()
+    embed = nextcord.Embed(title="Список плохих слов", description="Список всех плохих слов в базе данных.",
+                           color=0x223eff)
+    for i in bad_words:
+        embed.add_field(name="Слово", value=i[0], inline=False)
+    await interaction.response.send_message(embed=embed, ephemeral=True)
+
+
 @bot.slash_command(description="Показывает список всех команд в алфавитном порядке.")
 async def commands(interaction: nextcord.Interaction):
     embed_commands = nextcord.Embed(title="Список всех команд", description="Список всех команд в алфавитном порядке.",
                                     color=0x223eff)
+    embed_commands.add_field(name="/add_bad_word", value="Добавляет плохое слово(плохие слова) в базу данных.",
+                             inline=False)
     embed_commands.add_field(name="/add_streamer", value="Добавляет стримера в базу данных.", inline=False)
+    embed_commands.add_field(name="/bad_words", value="Показывает список всех плохих слов.", inline=False)
     embed_commands.add_field(name="/ban", value="Банит участника сервера.", inline=False)
     embed_commands.add_field(name="/clear_all_warns", value="Удаляет все предупреждения на сервере.", inline=False)
     embed_commands.add_field(name="/clear_warns", value="Удаляет все предупреждения пользователя.", inline=False)
@@ -464,6 +515,7 @@ async def commands(interaction: nextcord.Interaction):
     embed_commands.add_field(name="/mute", value="Не даёт человеку писать на сервере некоторое время.", inline=False)
     embed_commands.add_field(name="/profile", value="Показывает ваш уровень и количество сообщений, которые вы "
                                                     "написали.", inline=False)
+    embed_commands.add_field(name="/remove_bad_word", value="Удаляет плохое слово из базы данных.", inline=False)
     embed_commands.add_field(name="/remove_streamer", value="Удаляет стримера из базы данных.", inline=False)
     embed_commands.add_field(name="/rps", value="Играет с вами в камень-ножницы-бумага.", inline=False)
     embed_commands.add_field(name="/unban", value="Разбанивает пользователя по id.", inline=False)
