@@ -140,8 +140,9 @@ async def on_message(msg):  # this is an AutoMod function, which is created to a
     if msg.author != bot.user:  # checks, if user isn't a bot.
         for text in bad_words_list:  # bot chooses a word from a "bad word" list
             for i in adminRoles:  # bot chooses an administrative role from a list
-                if i not in str(msg.author.roles) and text in str(msg.content.lower()):  # bot checks a word and
-                    # comapares the word with words in "bad words" list in lower case
+                if ((i not in str(msg.author.roles) and f" {text} " in str(msg.content.lower())) or
+                        str(msg.content.lower() == text)) or f"{text} " in str(msg.content.lower()):  # bot checks a
+                    # word and comapares the word with words in "bad words" list in lower case
                     await msg.delete()  # deletes a message
                     if logging is True:  # checks, if he should save log in logging channel
                         log_channel = bot.get_channel(logsChannel)  # gets log channel id
