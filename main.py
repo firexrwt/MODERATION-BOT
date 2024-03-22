@@ -76,8 +76,7 @@ async def on_ready():  # this method shows, that the bot is running: it writes a
 
 
 @bot.event
-async def on_member_join(
-        member):  # this method does a few things, when a user arrives: adds him a default role and also
+async def on_member_join(member):  # this method does a few things, when a user arrives: adds him a default role and also
     # send an embed message to a specific channel with greetings
     channel = bot.get_channel(909086509993459742)  # bot gets an ID of a specific "greetings" channel
     # (if you want to make this word, then change an ID to your own channel ID
