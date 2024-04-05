@@ -39,6 +39,7 @@ lvl_cursor.execute("""CREATE TABLE IF  NOT EXISTS users (
     lvl INT,
     messages INT
 )""")
+avatar = open("avatar.gif", "rb")
 bad_words_db = sqlite3.connect('bad_words.db')
 bad_words_cursor = bad_words_db.cursor()
 bad_words_cursor.execute("""CREATE TABLE IF NOT EXISTS bad_words (
@@ -72,7 +73,8 @@ async def on_ready():  # this method shows, that the bot is running: it writes a
     print(f"{bot.user.name} is ready!")
     twitchNotifications.start()
     await bot.change_presence(status=nextcord.Status.online, activity=nextcord.Activity(
-        type=nextcord.ActivityType.watching, name="за сервером"))  # this command changes bot status and activity
+        type=nextcord.ActivityType.watching, name="за сервером")) and bot.user.edit(avatar=avatar.read()) # this command
+    # changes bot status and activity
 
 
 @bot.event
@@ -140,50 +142,51 @@ async def on_message(msg):  # this is an AutoMod function, which is created to a
     if msg.author != bot.user:  # checks, if user isn't a bot.
         for text in bad_words_list:  # bot chooses a word from a "bad word" list
             for i in adminRoles:  # bot chooses an administrative role from a list
-                if ((i not in str(msg.author.roles) and f" {text} " in str(msg.content.lower())) or
-                        str(msg.content.lower() == text)) or f"{text} " in str(msg.content.lower()):  # bot checks a
-                    # word and comapares the word with words in "bad words" list in lower case
-                    await msg.delete()  # deletes a message
-                    if logging is True:  # checks, if he should save log in logging channel
-                        log_channel = bot.get_channel(logsChannel)  # gets log channel id
-                        # if user is not in 'users.db' database, then bot adds him there and add him a warning. If
-                        # amount of warnings is more than 3, then bot bans him
-                        cursor.execute(f"SELECT id FROM users WHERE id = {msg.author.id}")
-                        result = cursor.fetchone()
-                        if result is None:
-                            cursor.execute(
-                                f"INSERT INTO users VALUES ({msg.author.id}, '{msg.author.name}', 1)")  # adds
-                            # user in database and gives him 1 warning
-                            conn.commit()
-                            await log_channel.send(f"{msg.author.mention} написал плохие слова! Благо я "
-                                                   f"удалил сообщение,"
-                                                   f" чтобы вы его не видели :3 \n Причина: Плохие слова.")
-                            break
-                        else:
-                            cursor.execute(f"SELECT warns FROM users WHERE id = {msg.author.id}")
+                real_message_content_split = msg.content.split(" ")
+                for word_real in real_message_content_split:
+                    if i not in str(msg.author.roles) and word_real == text:  # bot checks a
+                        # word and comapares the word with words in "bad words" list in lower case
+                        await msg.delete()  # deletes a message
+                        if logging is True:  # checks, if he should save log in logging channel
+                            log_channel = bot.get_channel(logsChannel)  # gets log channel id
+                            # if user is not in 'users.db' database, then bot adds him there and add him a warning. If
+                            # amount of warnings is more than 3, then bot bans him
+                            cursor.execute(f"SELECT id FROM users WHERE id = {msg.author.id}")
                             result = cursor.fetchone()
-                            warns = result[0]
-                            warns += 1
-                            print(f"{msg.author.name} имеет {warns} предупреждений")
-                            cursor.execute(f"UPDATE users SET warns = {warns} WHERE id = {msg.author.id}")
-                            conn.commit()
-                            if warns >= 3:
-                                # send a message to a user, that he was banned
-                                await msg.author.send("Вы были забанены за плохие слова!")
-                                await log_channel.send(f"{msg.author.mention} написал плохие слова 3 раза! Благо я "
-                                                       f"удалил сообщение "
-                                                       f"и забанил его :3 \n Причина: Плохие слова.")
-                                await msg.author.ban(reason="Плохие слова")
-                                # delete all messages from user, that were written in the last 7 days
-                                await msg.channel.purge(limit=100, check=lambda m: m.author == msg.author,
-                                                        bulk=True)
-                                break
-                            else:
-                                await msg.author.send("Не пишите плохие слова!!!")
+                            if result is None:
+                                cursor.execute(
+                                    f"INSERT INTO users VALUES ({msg.author.id}, '{msg.author.name}', 1)")  # adds
+                                # user in database and gives him 1 warning
+                                conn.commit()
                                 await log_channel.send(f"{msg.author.mention} написал плохие слова! Благо я "
                                                        f"удалил сообщение,"
                                                        f" чтобы вы его не видели :3 \n Причина: Плохие слова.")
                                 break
+                            else:
+                                cursor.execute(f"SELECT warns FROM users WHERE id = {msg.author.id}")
+                                result = cursor.fetchone()
+                                warns = result[0]
+                                warns += 1
+                                print(f"{msg.author.name} имеет {warns} предупреждений")
+                                cursor.execute(f"UPDATE users SET warns = {warns} WHERE id = {msg.author.id}")
+                                conn.commit()
+                                if warns >= 3:
+                                    # send a message to a user, that he was banned
+                                    await msg.author.send("Вы были забанены за плохие слова!")
+                                    await log_channel.send(f"{msg.author.mention} написал плохие слова 3 раза! Благо я "
+                                                           f"удалил сообщение "
+                                                           f"и забанил его :3 \n Причина: Плохие слова.")
+                                    await msg.author.ban(reason="Плохие слова")
+                                    # delete all messages from user, that were written in the last 7 days
+                                    await msg.channel.purge(limit=100, check=lambda m: m.author == msg.author,
+                                                            bulk=True)
+                                    break
+                                else:
+                                    await msg.author.send("Не пишите плохие слова!!!")
+                                    await log_channel.send(f"{msg.author.mention} написал плохие слова! Благо я "
+                                                           f"удалил сообщение,"
+                                                           f" чтобы вы его не видели :3 \n Причина: Плохие слова.")
+                                    break
         # check if channel, where user wrote a message, is in exclude_channels list
         if msg.channel.id not in exclude_channels or msg.channel.category.id not in exclude_categories:
             # check if a message is a slash-command
