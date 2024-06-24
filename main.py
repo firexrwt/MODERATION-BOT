@@ -82,7 +82,8 @@ async def on_member_join(member):  # this method does a few things, when a user 
     # send an embed message to a specific channel with greetings
     channel = bot.get_channel(909086509993459742)  # bot gets an ID of a specific "greetings" channel
     # (if you want to make this word, then change an ID to your own channel ID
-    embed = nextcord.Embed(title="Добро пожаловать!!", description=f"{member.mention} зашел на сервер!")  # this creates
+    embed = nextcord.Embed(title="Добро пожаловать!!", description=f"{member.mention} зашел на сервер!",
+                           color=nextcord.Color.blue())  # this creates
     # an embed message. You can change the title and the description of this message.
     await channel.send(embed=embed)  # this sends previously created embed message
     role = nextcord.utils.get(member.guild.roles, name='Подписчик')  # this command creates a function with
