@@ -18,7 +18,7 @@ file = open('config.json', 'r')  # you must create file with same name and make 
 #   "token": "***your token***"
 # }
 config = json.load(file)  # this command loads config file with token
-adminRoles = ["Админ"]  # list of administrative roles
+adminRoles = ["Админ", "Основатель", "Бездушные машины"]  # list of administrative roles
 intents = nextcord.Intents().all()
 bot = commands.Bot(command_prefix="!", intents=intents)  # creates usual command prefix, just because it is required for
 # commands, that are not slash commands
@@ -52,7 +52,7 @@ exclude_channels = [909083335064682519, 1042869059378749460, 1168564388194689116
                     909094954129850418, 909198474061443153, 1155510065508401203, 1057604521888579604,
                     1057454748611137559,
                     909203930725093416, 909204194697809951, 1042868984950820934, 1156421256896319598,
-                    909086509993459742, 909089711501504532]
+                    909086509993459742, 909089711501504532, 1258808539326058537]
 exclude_categories = [1052532014844235816]
 lvl_roles = ["УРОВЕНЬ 60 - ЛЕГЕНДА", "УРОВЕНЬ 30 - БЫВАЛЫЙ ПОДПИСЧИК", "УРОВЕНЬ 10 - АКТИВНЫЙ ПОДПИСЧИК",
              "УРОВЕНЬ 1 - МОЛОКОСОС"]
@@ -73,12 +73,14 @@ async def on_ready():  # this method shows, that the bot is running: it writes a
     print(f"{bot.user.name} is ready!")
     twitchNotifications.start()
     await bot.change_presence(status=nextcord.Status.online, activity=nextcord.Activity(
-        type=nextcord.ActivityType.watching, name="за сервером")) and bot.user.edit(avatar=avatar.read()) # this command
+        type=nextcord.ActivityType.watching, name="за сервером")) and bot.user.edit(
+        avatar=avatar.read())  # this command
     # changes bot status and activity
 
 
 @bot.event
-async def on_member_join(member):  # this method does a few things, when a user arrives: adds him a default role and also
+async def on_member_join(
+        member):  # this method does a few things, when a user arrives: adds him a default role and also
     # send an embed message to a specific channel with greetings
     channel = bot.get_channel(909086509993459742)  # bot gets an ID of a specific "greetings" channel
     # (if you want to make this word, then change an ID to your own channel ID
@@ -181,6 +183,7 @@ async def on_message(msg):  # this is an AutoMod function, which is created to a
                                     # delete all messages from user, that were written in the last 7 days
                                     await msg.channel.purge(limit=100, check=lambda m: m.author == msg.author,
                                                             bulk=True)
+                                    lvl_cursor.execute(f"DELETE FROM users WHERE id = {msg.author.id}")
                                     break
                                 else:
                                     await msg.author.send("Не пишите плохие слова!!!")
@@ -189,39 +192,42 @@ async def on_message(msg):  # this is an AutoMod function, which is created to a
                                                            f" чтобы вы его не видели :3 \n Причина: Плохие слова.")
                                     break
         # check if channel, where user wrote a message, is in exclude_channels list
-        if msg.channel.id not in exclude_channels or msg.channel.category.id not in exclude_categories:
-            # check if a message is a slash-command
-            if msg.content.startswith("/") is False:
-                lvl_cursor.execute(f"SELECT id FROM users WHERE id = {msg.author.id}")
-                result = lvl_cursor.fetchone()
-                if result is None:
-                    lvl_cursor.execute(
-                        f"INSERT INTO users VALUES ({msg.author.id}, '{msg.author.name}', 0, 1)")
-                    lvl_db.commit()
-                    await check_lvl_roles()
-                else:
-                    lvl_cursor.execute(f"SELECT messages FROM users WHERE id = {msg.author.id}")
+        if int(msg.channel.category.id) not in exclude_categories:
+            if int(msg.channel.id) not in exclude_channels:
+                # check if a message is a slash-command
+                if msg.content.startswith("/") is False:
+                    lvl_cursor.execute(f"SELECT id FROM users WHERE id = {msg.author.id}")
                     result = lvl_cursor.fetchone()
-                    messages = result[0]
-                    messages += 1
-                    print(f"{msg.author.name} написал {messages} сообщений в "
-                          f"{datetime.datetime.now().strftime('%H:%M:%S')}")
-                    lvl_cursor.execute(f"UPDATE users SET messages = {messages} WHERE id = {msg.author.id}")
-                    lvl_db.commit()
-                    lvl_cursor.execute(f"SELECT lvl FROM users WHERE id = {msg.author.id}")
-                    result = lvl_cursor.fetchone()
-                    lvl = result[0]
-                    if messages >= 10 * (lvl + 1):
-                        lvl += 1
-                        lvl_logging_channel = bot.get_channel(new_lvl_channel)
-                        embed = nextcord.Embed(title="Поздравляем!", description=f"{msg.author.mention} "
-                                                                                 f"получил {lvl} уровень!")
-                        await lvl_logging_channel.send(embed=embed)
-                        lvl_cursor.execute(f"UPDATE users SET lvl = {lvl} WHERE id = {msg.author.id}")
-                        lvl_db.commit()
-                        lvl_cursor.execute(f"UPDATE users SET messages = 0 WHERE id = {msg.author.id}")
+                    if result is None:
+                        lvl_cursor.execute(
+                            f"INSERT INTO users VALUES ({msg.author.id}, '{msg.author.name}', 0, 1)")
                         lvl_db.commit()
                         await check_lvl_roles()
+                    else:
+                        lvl_cursor.execute(f"SELECT messages FROM users WHERE id = {msg.author.id}")
+                        result = lvl_cursor.fetchone()
+                        messages = result[0]
+                        messages += 1
+                        print(f"{msg.author.name} написал {messages} сообщений в "
+                              f"{datetime.datetime.now().strftime('%H:%M:%S')}")
+                        lvl_cursor.execute(f"UPDATE users SET messages = {messages} WHERE id = {msg.author.id}")
+                        lvl_db.commit()
+                        lvl_cursor.execute(f"SELECT lvl FROM users WHERE id = {msg.author.id}")
+                        result = lvl_cursor.fetchone()
+                        lvl = result[0]
+                        if messages >= 10 * (lvl + 1):
+                            lvl += 1
+                            lvl_logging_channel = bot.get_channel(new_lvl_channel)
+                            embed = nextcord.Embed(title="Поздравляем!", description=f"{msg.author.mention} "
+                                                                                     f"получил {lvl} уровень!")
+                            await lvl_logging_channel.send(embed=embed)
+                            lvl_cursor.execute(f"UPDATE users SET lvl = {lvl} WHERE id = {msg.author.id}")
+                            lvl_db.commit()
+                            lvl_cursor.execute(f"UPDATE users SET messages = 0 WHERE id = {msg.author.id}")
+                            lvl_db.commit()
+                            await check_lvl_roles()
+            else:
+                pass
         else:
             pass
 
@@ -242,6 +248,15 @@ async def kick(interaction: nextcord.Interaction, user: nextcord.Member, reason:
             await log_channel.send(f"{user.mention} был кикнут админом {interaction.user.mention}."
                                    f" Причина: {reason}")  # sends message in the log channel
         await user.kick(reason=reason)  # bot bans a person
+
+
+@bot.slash_command(description="Показывает количество сообщений в канале")
+async def messages_count(interaction: nextcord.Interaction):
+    messages = interaction.channel.history()
+    count = 0
+    async for message in messages:
+        count += 1
+    await interaction.response.send_message(f"Количество сообщений в канале: {count}", ephemeral=True)
 
 
 @bot.slash_command(description="Банит участника сервера.")  # this command is dedicated to ban user from server
@@ -516,6 +531,7 @@ async def commands(interaction: nextcord.Interaction):
     embed_commands.add_field(name="/kick", value="Кикает пользователя с сервера.", inline=False)
     embed_commands.add_field(name="/leaderboard", value="Показывает таблицу лидеров по уромню и количеству сообщений с "
                                                         "их количеством сообщений.", inline=False)
+    embed_commands.add_field(name="/messages_count", value="Показывает количество сообщений в канале.", inline=False)
     embed_commands.add_field(name="/mute", value="Не даёт человеку писать на сервере некоторое время.", inline=False)
     embed_commands.add_field(name="/profile", value="Показывает ваш уровень и количество сообщений, которые вы "
                                                     "написали.", inline=False)
@@ -726,6 +742,15 @@ async def twitchNotifications():
                 if result[0] == "LIVE":
                     streamers_cursor.execute('UPDATE streamers SET status = "OFFLINE" WHERE nickname = "%s"'
                                              % x[0])
+
+
+@bot.slash_command(description="Удаляет все сообщения конкретного юзера в канале.")
+async def delete_user_messages(interaction: nextcord.Interaction, user: nextcord.Member):
+    messages = await interaction.channel.history().flatten()
+    for message in messages:
+        if message.author == user:
+            await message.delete()
+    await interaction.response.send_message(f"Все сообщения пользователя {user.mention} были удалены!", ephemeral=True)
 
 
 bot.run(config['token'])  # bot runs up and gets a token from config file
