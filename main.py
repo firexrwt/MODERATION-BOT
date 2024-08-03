@@ -2,6 +2,11 @@ import datetime
 import json
 import sqlite3
 import random
+
+import aiohttp
+from PIL import Image
+from io import BytesIO
+from colorthief import ColorThief
 from twitch_notifications import checkIfLive
 
 import humanfriendly
@@ -54,8 +59,12 @@ exclude_channels = [909083335064682519, 1042869059378749460, 1168564388194689116
                     909203930725093416, 909204194697809951, 1042868984950820934, 1156421256896319598,
                     909086509993459742, 909089711501504532, 1258808539326058537]
 exclude_categories = [1052532014844235816]
-lvl_roles = ["УРОВЕНЬ 60 - ЛЕГЕНДА", "УРОВЕНЬ 30 - БЫВАЛЫЙ ПОДПИСЧИК", "УРОВЕНЬ 10 - АКТИВНЫЙ ПОДПИСЧИК",
-             "УРОВЕНЬ 1 - МОЛОКОСОС"]
+lvl_roles = {
+    "УРОВЕНЬ 60 - ЛЕГЕНДА": 60,
+    "УРОВЕНЬ 30 - БЫВАЛЫЙ ПОДПИСЧИК": 30,
+    "УРОВЕНЬ 10 - АКТИВНЫЙ ПОДПИСЧИК": 10,
+    "УРОВЕНЬ 1 - МОЛОКОСОС": 1
+}
 streamers_db = sqlite3.connect("streamers.db")
 streamers_cursor = streamers_db.cursor()
 # command creates a database with nickname of streamers and also store their status there
@@ -74,162 +83,112 @@ async def on_ready():  # this method shows, that the bot is running: it writes a
     twitchNotifications.start()
     await bot.change_presence(status=nextcord.Status.online, activity=nextcord.Activity(
         type=nextcord.ActivityType.watching, name="за сервером")) and bot.user.edit(
-        avatar=avatar.read())  # this command
+        avatar=avatar.read()) and check_lvl_roles()  # this command
     # changes bot status and activity
 
 
 @bot.event
-async def on_member_join(
-        member):  # this method does a few things, when a user arrives: adds him a default role and also
-    # send an embed message to a specific channel with greetings
-    channel = bot.get_channel(909086509993459742)  # bot gets an ID of a specific "greetings" channel
-    # (if you want to make this word, then change an ID to your own channel ID
+async def on_member_join(member):
+    channel = bot.get_channel(909086509993459742)
     embed = nextcord.Embed(title="Добро пожаловать!!", description=f"{member.mention} зашел на сервер!",
-                           color=nextcord.Color.blue())  # this creates
-    # an embed message. You can change the title and the description of this message.
-    await channel.send(embed=embed)  # this sends previously created embed message
-    role = nextcord.utils.get(member.guild.roles, name='Подписчик')  # this command creates a function with
-    # specific role, that you choose. You can change the name of the role, that you want to give, or you can delete
-    # this command, if you don't need it.
-    await member.add_roles(role)  # this command adds the role in the user role-list
+                           color=nextcord.Color.blue())
+    await channel.send(embed=embed)
+    role = nextcord.utils.get(member.guild.roles, name='Подписчик')
+    await member.add_roles(role)
+
+
+async def update_member_roles(member, lvl):
+    for role_name, required_lvl in lvl_roles.items():
+        role = nextcord.utils.get(member.guild.roles, name=role_name)
+        if role is not None:
+            if lvl >= required_lvl and role not in member.roles:
+                await member.add_roles(role)
+            elif lvl < required_lvl and role in member.roles:
+                await member.remove_roles(role)
 
 
 @bot.event
 async def check_lvl_roles():
     while True:
-        for member in bot.get_all_members():
-            if member.bot is False:
-                lvl_cursor.execute(f"SELECT lvl FROM users WHERE id = {member.id}")
-                result = lvl_cursor.fetchone()
-                lvl = result[0]
-                for i in lvl_roles:
-                    if i not in str(member.roles):
-                        if i == "УРОВЕНЬ 60 - ЛЕГЕНДА" and lvl >= 60:
-                            role = nextcord.utils.get(member.guild.roles, name=i)
-                            await member.add_roles(role)
-                        elif i == "УРОВЕНЬ 30 - БЫВАЛЫЙ ПОДПИСЧИК" and lvl >= 30:
-                            role = nextcord.utils.get(member.guild.roles, name=i)
-                            await member.add_roles(role)
-                        elif i == "УРОВЕНЬ 10 - АКТИВНЫЙ ПОДПИСЧИК" and lvl >= 10:
-                            role = nextcord.utils.get(member.guild.roles, name=i)
-                            await member.add_roles(role)
-                        elif i == "УРОВЕНЬ 1 - МОЛОКОСОС" and lvl >= 1:
-                            role = nextcord.utils.get(member.guild.roles, name=i)
-                            await member.add_roles(role)
-                    else:
-                        if i == "УРОВЕНЬ 60 - ЛЕГЕНДА" and lvl < 60:
-                            role = nextcord.utils.get(member.guild.roles, name=i)
+        for guild in bot.guilds:
+            for member in guild.members:
+                if not member.bot:
+                    lvl_cursor.execute("SELECT lvl FROM users WHERE id = ?", (member.id,))
+                    result = lvl_cursor.fetchone()
+                    if result is not None:
+                        lvl = result[0]
+                        await update_member_roles(member, lvl)
+                else:
+                    for role_name in lvl_roles:
+                        role = nextcord.utils.get(guild.roles, name=role_name)
+                        if role in member.roles:
                             await member.remove_roles(role)
-                        elif i == "УРОВЕНЬ 30 - БЫВАЛЫЙ ПОДПИСЧИК" and lvl < 30:
-                            role = nextcord.utils.get(member.guild.roles, name=i)
-                            await member.remove_roles(role)
-                        elif i == "УРОВЕНЬ 10 - АКТИВНЫЙ ПОДПИСЧИК" and lvl < 10:
-                            role = nextcord.utils.get(member.guild.roles, name=i)
-                            await member.remove_roles(role)
-                        elif i == "УРОВЕНЬ 1 - МОЛОКОСОС" and lvl < 1:
-                            role = nextcord.utils.get(member.guild.roles, name=i)
-                            await member.remove_roles(role)
-            else:
-                for i in lvl_roles:
-                    if i in str(member.roles):
-                        role = nextcord.utils.get(member.guild.roles, name=i)
-                        await member.remove_roles(role)
         await nextcord.utils.sleep_until(datetime.datetime.now() + datetime.timedelta(minutes=1))
 
 
 @bot.event
-async def on_message(msg):  # this is an AutoMod function, which is created to automaticaly moderate the chat.
+async def on_message(msg):
+    if msg.author == bot.user:
+        return
+
+    # Retrieve bad words list once, instead of on every message
     bad_words_cursor.execute("SELECT word FROM bad_words")
-    bad_words_list = [i[0] for i in bad_words_cursor.fetchall()]
-    # This function doesn't linked to a specific channel, this moderates the WHOLE server.
-    if msg.author != bot.user:  # checks, if user isn't a bot.
-        for text in bad_words_list:  # bot chooses a word from a "bad word" list
-            for i in adminRoles:  # bot chooses an administrative role from a list
-                real_message_content_split = msg.content.split(" ")
-                for word_real in real_message_content_split:
-                    if i not in str(msg.author.roles) and word_real == text:  # bot checks a
-                        # word and comapares the word with words in "bad words" list in lower case
-                        await msg.delete()  # deletes a message
-                        if logging is True:  # checks, if he should save log in logging channel
-                            log_channel = bot.get_channel(logsChannel)  # gets log channel id
-                            # if user is not in 'users.db' database, then bot adds him there and add him a warning. If
-                            # amount of warnings is more than 3, then bot bans him
-                            cursor.execute(f"SELECT id FROM users WHERE id = {msg.author.id}")
-                            result = cursor.fetchone()
-                            if result is None:
-                                cursor.execute(
-                                    f"INSERT INTO users VALUES ({msg.author.id}, '{msg.author.name}', 1)")  # adds
-                                # user in database and gives him 1 warning
-                                conn.commit()
-                                await log_channel.send(f"{msg.author.mention} написал плохие слова! Благо я "
-                                                       f"удалил сообщение,"
-                                                       f" чтобы вы его не видели :3 \n Причина: Плохие слова.")
-                                break
-                            else:
-                                cursor.execute(f"SELECT warns FROM users WHERE id = {msg.author.id}")
-                                result = cursor.fetchone()
-                                warns = result[0]
-                                warns += 1
-                                print(f"{msg.author.name} имеет {warns} предупреждений")
-                                cursor.execute(f"UPDATE users SET warns = {warns} WHERE id = {msg.author.id}")
-                                conn.commit()
-                                if warns >= 3:
-                                    # send a message to a user, that he was banned
-                                    await msg.author.send("Вы были забанены за плохие слова!")
-                                    await log_channel.send(f"{msg.author.mention} написал плохие слова 3 раза! Благо я "
-                                                           f"удалил сообщение "
-                                                           f"и забанил его :3 \n Причина: Плохие слова.")
-                                    await msg.author.ban(reason="Плохие слова")
-                                    # delete all messages from user, that were written in the last 7 days
-                                    await msg.channel.purge(limit=100, check=lambda m: m.author == msg.author,
-                                                            bulk=True)
-                                    lvl_cursor.execute(f"DELETE FROM users WHERE id = {msg.author.id}")
-                                    break
-                                else:
-                                    await msg.author.send("Не пишите плохие слова!!!")
-                                    await log_channel.send(f"{msg.author.mention} написал плохие слова! Благо я "
-                                                           f"удалил сообщение,"
-                                                           f" чтобы вы его не видели :3 \n Причина: Плохие слова.")
-                                    break
-        # check if channel, where user wrote a message, is in exclude_channels list
-        if int(msg.channel.category.id) not in exclude_categories:
-            if int(msg.channel.id) not in exclude_channels:
-                # check if a message is a slash-command
-                if msg.content.startswith("/") is False:
-                    lvl_cursor.execute(f"SELECT id FROM users WHERE id = {msg.author.id}")
-                    result = lvl_cursor.fetchone()
-                    if result is None:
-                        lvl_cursor.execute(
-                            f"INSERT INTO users VALUES ({msg.author.id}, '{msg.author.name}', 0, 1)")
-                        lvl_db.commit()
-                        await check_lvl_roles()
+    bad_words_list = set(word[0] for word in bad_words_cursor.fetchall())
+    author_roles = {role.id for role in msg.author.roles}
+
+    if not author_roles.intersection(adminRoles):
+        if any(word in msg.content.lower().split() for word in bad_words_list):
+            await msg.delete()
+            if logging:
+                log_channel = bot.get_channel(logsChannel)
+                cursor.execute("SELECT warns FROM users WHERE id = ?", (msg.author.id,))
+                result = cursor.fetchone()
+                if result is None:
+                    cursor.execute("INSERT INTO users (id, name, warns) VALUES (?, ?, 1)",
+                                   (msg.author.id, msg.author.name))
+                    conn.commit()
+                    await log_channel.send(
+                        f"{msg.author.mention} написал плохие слова! Сообщение удалено. Причина: Плохие слова.")
+                else:
+                    warns = result[0] + 1
+                    cursor.execute("UPDATE users SET warns = ? WHERE id = ?", (warns, msg.author.id))
+                    conn.commit()
+                    if warns >= 3:
+                        await msg.author.send("Вы были забанены за плохие слова!")
+                        await log_channel.send(
+                            f"{msg.author.mention} написал плохие слова 3 раза! Сообщение удалено и пользователь"
+                            f" забанен. Причина: Плохие слова.")
+                        await msg.author.ban(reason="Плохие слова")
+                        await msg.channel.purge(limit=100, check=lambda m: m.author == msg.author, bulk=True)
+                        lvl_cursor.execute("DELETE FROM users WHERE id = ?", (msg.author.id,))
                     else:
-                        lvl_cursor.execute(f"SELECT messages FROM users WHERE id = {msg.author.id}")
-                        result = lvl_cursor.fetchone()
-                        messages = result[0]
-                        messages += 1
-                        print(f"{msg.author.name} написал {messages} сообщений в "
-                              f"{datetime.datetime.now().strftime('%H:%M:%S')}")
-                        lvl_cursor.execute(f"UPDATE users SET messages = {messages} WHERE id = {msg.author.id}")
-                        lvl_db.commit()
-                        lvl_cursor.execute(f"SELECT lvl FROM users WHERE id = {msg.author.id}")
-                        result = lvl_cursor.fetchone()
-                        lvl = result[0]
-                        if messages >= 10 * (lvl + 1):
-                            lvl += 1
-                            lvl_logging_channel = bot.get_channel(new_lvl_channel)
-                            embed = nextcord.Embed(title="Поздравляем!", description=f"{msg.author.mention} "
-                                                                                     f"получил {lvl} уровень!")
-                            await lvl_logging_channel.send(embed=embed)
-                            lvl_cursor.execute(f"UPDATE users SET lvl = {lvl} WHERE id = {msg.author.id}")
-                            lvl_db.commit()
-                            lvl_cursor.execute(f"UPDATE users SET messages = 0 WHERE id = {msg.author.id}")
-                            lvl_db.commit()
-                            await check_lvl_roles()
-            else:
-                pass
+                        await msg.author.send("Не пишите плохие слова!!!")
+                        await log_channel.send(
+                            f"{msg.author.mention} написал плохие слова! Сообщение удалено. Причина: Плохие слова.")
+
+    if (msg.channel.category and msg.channel.category.id not in exclude_categories and
+            msg.channel.id not in exclude_channels and
+            not msg.content.startswith("/")):
+        lvl_cursor.execute("SELECT messages, lvl FROM users WHERE id = ?", (msg.author.id,))
+        result = lvl_cursor.fetchone()
+        if result is None:
+            lvl_cursor.execute("INSERT INTO users (id, name, messages, lvl) VALUES (?, ?, 1, 0)",
+                               (msg.author.id, msg.author.name))
+            lvl_db.commit()
+            await check_lvl_roles()
         else:
-            pass
+            messages, lvl = result
+            messages += 1
+            lvl_cursor.execute("UPDATE users SET messages = ? WHERE id = ?", (messages, msg.author.id))
+            lvl_db.commit()
+            if messages >= 10 * (lvl + 1):
+                lvl += 1
+                lvl_cursor.execute("UPDATE users SET lvl = ?, messages = 0 WHERE id = ?", (lvl, msg.author.id))
+                lvl_db.commit()
+                lvl_logging_channel = bot.get_channel(new_lvl_channel)
+                embed = nextcord.Embed(title="Поздравляем!", description=f"{msg.author.mention} получил {lvl} уровень!")
+                await lvl_logging_channel.send(embed=embed)
+                await update_member_roles(msg.author, lvl)
 
 
 @bot.slash_command(description="Кикает пользователя с сервера.")  # this command is dedicated to kick user from server
@@ -280,44 +239,47 @@ async def ban(interaction: nextcord.Interaction, user: nextcord.Member, reason: 
 
 @bot.slash_command(description="Не даёт человеку писать на сервере некоторое время.")  # this command is dedicated
 # to mute user on a server for a specific time
-async def mute(interaction: nextcord.Interaction, user: nextcord.Member, duration, reason: str):  # this method requires
-    # to write a nickname of user and a reason of kick
-    if not interaction.user.guild_permissions.administrator:  # bot checks, if user,
-        # that tries to use a command is an administrator
-        await interaction.response.send_message("Вы не являетесь администратором, "
-                                                "потому вы не можете использовать эту команду!", ephemeral=True)  #
-        # this command sends a response, if user is not an administrator
-    else:
-        duration_sec = humanfriendly.parse_timespan(duration)  # turns usual time to a seconds
-        # for example: "1m = 60 sec"
-        await interaction.response.send_message(f"{user.mention} был замучен!", ephemeral=True)  # bot responds to
-        # your command
-        if logging is True:  # checks, if he should save log in logging channel
-            log_channel = bot.get_channel(logsChannel)  # gets log channel id
-            await log_channel.send(f"{user.mention} был замучен админом {interaction.user.mention} на {duration}."
-                                   f" Причина: {reason}.")  # sends message in the log channel
-        await user.edit(timeout=nextcord.utils.utcnow() + datetime.timedelta(seconds=duration_sec))  # bot mutes user
-        # for a written time
+async def mute(interaction: nextcord.Interaction, user: nextcord.Member, duration: str, reason: str):
+    # Check if the user invoking the command has administrator permissions
+    if not interaction.user.guild_permissions.administrator:
+        await interaction.response.send_message("Вы не являетесь администратором, поэтому не можете использовать эту команду!", ephemeral=True)
+        return
+
+    # Attempt to convert the provided duration to seconds
+    try:
+        duration_sec = humanfriendly.parse_timespan(duration)
+    except ValueError:
+        # Inform the user if the provided duration format is incorrect
+        await interaction.response.send_message("Некорректный формат времени. Используйте, например, '10s' для 10 секунд, '5m' для 5 минут, и т.д.", ephemeral=True)
+        return
+
+    # Apply the mute by setting the user's timeout until the specified end time
+    mute_end_time = nextcord.utils.utcnow() + datetime.timedelta(seconds=duration_sec)
+    await user.edit(timeout=mute_end_time)  # Set the time until which the user will be muted
+
+    # Log the mute action if logging is enabled
+    if logging:
+        log_channel = bot.get_channel(logsChannel)
+        await log_channel.send(
+            f"{user.mention} был замучен администратором {interaction.user.mention} на {duration}. Причина: {reason}.")
+
+    # Send a message indicating that the user has been muted
+    await interaction.response.send_message(f"{user.mention} был замучен на {duration}!", ephemeral=True)
 
 
 @bot.slash_command(description="Возвращает возможность писать в чат выбранному участнику сервера.")  # this method is
 # dedicated to unmute user and return him a possibility to write in chat and join a voice channels
-async def unmute(interaction: nextcord.Interaction, user: nextcord.Member, reason: str):  # this method requires
-    # to write a nickname of user and a reason of unmute
-    if not interaction.user.guild_permissions.administrator:  # bot checks, if user,
-        # that tries to use a command is an administrator
-        await interaction.response.send_message("Вы не являетесь администратором, "
-                                                "потому вы не можете использовать эту команду!", ephemeral=True)  #
-        # this command sends a response, if user is not an administrator
-    else:
-        await interaction.response.send_message(f"{user.mention} был размучен!", ephemeral=True)  # bot responds to
-        # your command
-        if logging is True:  # checks, if he should save log in logging channel
-            log_channel = bot.get_channel(logsChannel)  # gets log channel id
-            await log_channel.send(f"{user.mention} был размучен админом {interaction.user.mention}."
-                                   f" Причина: {reason}.")  # sends message in the log channel
-        await user.edit(timeout=nextcord.utils.utcnow())  # this command changes the mute time to the current UTC time,
-    # which removes the mute
+async def unmute(interaction: nextcord.Interaction, user: nextcord.Member, reason: str):
+    if not interaction.user.guild_permissions.administrator:
+        await interaction.response.send_message("Вы не являетесь администратором, поэтому не можете использовать эту команду!", ephemeral=True)
+        return
+
+    await user.edit(timeout=None)
+    await interaction.response.send_message(f"{user.mention} был размучен!", ephemeral=True)
+
+    if logging:
+        log_channel = bot.get_channel(logsChannel)
+        await log_channel.send(f"{user.mention} был размучен администратором {interaction.user.mention}. Причина: {reason}.")
 
 
 @bot.slash_command(description="Удаляет определенное сообщение по id и выбранному каналу.")
@@ -343,25 +305,40 @@ async def delete_message(interaction: nextcord.Interaction, channel: nextcord.Te
 
 @bot.slash_command(description="Показывает список предупреждений пользователя.")
 async def warns(interaction: nextcord.Interaction, user: nextcord.Member):
-    if not interaction.user.guild_permissions.administrator:
-        await interaction.response.send_message("Вы не являетесь администратором, "
-                                                "потому вы не можете использовать эту команду!", ephemeral=True)
-    else:
-        cursor.execute(f"SELECT warns FROM users WHERE id = {user.id}")
-        result = cursor.fetchone()
-        warns_count = result[0]
-        if warns_count is None:
-            await interaction.response.send_message(f"У пользователя {user.mention} нет предупреждений.",
-                                                    ephemeral=True)
+    # Проверяем, является ли пользователь администратором или запрашивает информацию о себе
+    if not interaction.user.guild_permissions.administrator and interaction.user != user:
+        await interaction.response.send_message(
+            "Вы не являетесь администратором и не можете просматривать предупреждения других пользователей.",
+            ephemeral=True
+        )
+        return
+
+    # Получаем количество предупреждений пользователя
+    cursor.execute("SELECT warns FROM users WHERE id = ?", (user.id,))
+    result = cursor.fetchone()
+    warns_count = result[0] if result else 0
+
+    # Определяем сообщение в зависимости от того, кто просматривает предупреждения
+    if interaction.user == user:
+        if warns_count == 0:
+            message = "У вас нет предупреждений."
         elif warns_count == 1:
-            await interaction.response.send_message(f"У пользователя {user.mention} 1 предупреждение.",
-                                                    ephemeral=True)
-        elif warns_count == 2 or warns_count == 3 or warns_count == 4:
-            await interaction.response.send_message(f"У пользователя {user.mention} {warns_count} предупреждения.",
-                                                    ephemeral=True)
+            message = "У вас 1 предупреждение."
+        elif 2 <= warns_count <= 4:
+            message = f"У вас {warns_count} предупреждения."
         else:
-            await interaction.response.send_message(f"У пользователя {user.mention} {warns_count} предупреждений.",
-                                                    ephemeral=True)
+            message = f"У вас {warns_count} предупреждений."
+    else:
+        if warns_count == 0:
+            message = f"У пользователя {user.mention} нет предупреждений."
+        elif warns_count == 1:
+            message = f"У пользователя {user.mention} 1 предупреждение."
+        elif 2 <= warns_count <= 4:
+            message = f"У пользователя {user.mention} {warns_count} предупреждения."
+        else:
+            message = f"У пользователя {user.mention} {warns_count} предупреждений."
+
+    await interaction.response.send_message(message, ephemeral=True)
 
 
 @bot.slash_command(description="Выдаёт предупреждение пользователю.")
@@ -443,39 +420,34 @@ async def unban(interaction: nextcord.Interaction, user_id, reason: str):
 
 
 @bot.slash_command(description="Играет с вами в камень-ножницы-бумага.")
-async def rps(interaction: nextcord.Interaction, choice):
+async def rps(interaction: nextcord.Interaction, choice: str):
     choices = ["камень", "бумага", "ножницы"]
-    bot_choice = random.choice(choices)
-    if choice == "камень":
-        if bot_choice == "камень":
-            await interaction.response.send_message("Ничья!", ephemeral=True)
-        elif bot_choice == "бумага":
-            await interaction.response.send_message("Я выиграл!", ephemeral=True)
-        elif bot_choice == "ножницы":
-            await interaction.response.send_message("Вы выиграли!", ephemeral=True)
-    elif choice == "бумага":
-        if bot_choice == "камень":
-            await interaction.response.send_message("Вы выиграли!", ephemeral=True)
-        elif bot_choice == "бумага":
-            await interaction.response.send_message("Ничья!", ephemeral=True)
-        elif bot_choice == "ножницы":
-            await interaction.response.send_message("Я выиграл!", ephemeral=True)
-    elif choice == "ножницы":
-        if bot_choice == "камень":
-            await interaction.response.send_message("Я выиграл!", ephemeral=True)
-        elif bot_choice == "бумага":
-            await interaction.response.send_message("Вы выиграли!", ephemeral=True)
-        elif bot_choice == "ножницы":
-            await interaction.response.send_message("Ничья!", ephemeral=True)
-    else:
+    choice = choice.lower()
+
+    if choice not in choices:
         await interaction.response.send_message("Вы должны выбрать из этих вариантов: камень, бумага, ножницы",
                                                 ephemeral=True)
+        return
+
+    bot_choice = random.choice(choices)
+    result_messages = {
+        ("камень", "камень"): "Ничья!",
+        ("камень", "бумага"): "Я выиграл!",
+        ("камень", "ножницы"): "Вы выиграли!",
+        ("бумага", "камень"): "Вы выиграли!",
+        ("бумага", "бумага"): "Ничья!",
+        ("бумага", "ножницы"): "Я выиграл!",
+        ("ножницы", "камень"): "Я выиграл!",
+        ("ножницы", "бумага"): "Вы выиграли!",
+        ("ножницы", "ножницы"): "Ничья!",
+    }
+
+    result = result_messages[(choice, bot_choice)]
+    await interaction.response.send_message(result, ephemeral=True)
 
 
 @bot.slash_command(description="Добавляет плохое слово(плохие слова) в базу данных.")
 async def add_bad_word(interaction: nextcord.Interaction, word: str):
-    # эта команда добавляет плохое слово в базу данных. Она требует ввести слово, которое вы хотите добавить
-    # если администратов ввел текст с запятыми, то бот разделит текст на слова и добавит их в базу данных
     if not interaction.user.guild_permissions.administrator:
         await interaction.response.send_message("Вы не являетесь администратором, "
                                                 "потому вы не можете использовать эту команду!", ephemeral=True)
@@ -516,70 +488,91 @@ async def bad_words(interaction: nextcord.Interaction):
 
 @bot.slash_command(description="Показывает список всех команд в алфавитном порядке.")
 async def commands(interaction: nextcord.Interaction):
-    embed_commands = nextcord.Embed(title="Список всех команд", description="Список всех команд в алфавитном порядке.",
-                                    color=0x223eff)
-    embed_commands.add_field(name="/add_bad_word", value="Добавляет плохое слово(плохие слова) в базу данных.",
-                             inline=False)
-    embed_commands.add_field(name="/add_streamer", value="Добавляет стримера в базу данных.", inline=False)
-    embed_commands.add_field(name="/bad_words", value="Показывает список всех плохих слов.", inline=False)
-    embed_commands.add_field(name="/ban", value="Банит участника сервера.", inline=False)
-    embed_commands.add_field(name="/clear_all_warns", value="Удаляет все предупреждения на сервере.", inline=False)
-    embed_commands.add_field(name="/clear_warns", value="Удаляет все предупреждения пользователя.", inline=False)
-    embed_commands.add_field(name="/coinflip", value="Играет с вами в подбрасывание монетки.", inline=False)
-    embed_commands.add_field(name="/delete_message", value="Удаляет определенное сообщение по id и выбранному каналу.",
-                             inline=False)
-    embed_commands.add_field(name="/kick", value="Кикает пользователя с сервера.", inline=False)
-    embed_commands.add_field(name="/leaderboard", value="Показывает таблицу лидеров по уромню и количеству сообщений с "
-                                                        "их количеством сообщений.", inline=False)
-    embed_commands.add_field(name="/messages_count", value="Показывает количество сообщений в канале.", inline=False)
-    embed_commands.add_field(name="/mute", value="Не даёт человеку писать на сервере некоторое время.", inline=False)
-    embed_commands.add_field(name="/profile", value="Показывает ваш уровень и количество сообщений, которые вы "
-                                                    "написали.", inline=False)
-    embed_commands.add_field(name="/remove_bad_word", value="Удаляет плохое слово из базы данных.", inline=False)
-    embed_commands.add_field(name="/remove_streamer", value="Удаляет стримера из базы данных.", inline=False)
-    embed_commands.add_field(name="/rps", value="Играет с вами в камень-ножницы-бумага.", inline=False)
-    embed_commands.add_field(name="/unban", value="Разбанивает пользователя по id.", inline=False)
-    embed_commands.add_field(name="/unmute", value="Возвращает возможность писать в чат выбранному участнику сервера.",
-                             inline=False)
-    embed_commands.add_field(name="/warn", value="Выдаёт предупреждение пользователю.", inline=False)
-    embed_commands.add_field(name="/warns", value="Показывает список предупреждений пользователя.", inline=False)
+    commands_dict = {
+        "/add_bad_word": "Добавляет плохое слово(плохие слова) в базу данных.",
+        "/add_streamer": "Добавляет стримера в базу данных.",
+        "/bad_words": "Показывает список всех плохих слов.",
+        "/ban": "Банит участника сервера.",
+        "/clear_all_warns": "Удаляет все предупреждения на сервере.",
+        "/clear_warns": "Удаляет все предупреждения пользователя.",
+        "/coinflip": "Играет с вами в подбрасывание монетки.",
+        "/delete_message": "Удаляет определенное сообщение по id и выбранному каналу.",
+        "/kick": "Кикает пользователя с сервера.",
+        "/leaderboard": "Показывает таблицу лидеров по уровню и количеству сообщений с их количеством сообщений.",
+        "/messages_count": "Показывает количество сообщений в канале.",
+        "/mute": "Не даёт человеку писать на сервере некоторое время.",
+        "/profile": "Показывает ваш уровень и количество сообщений, которые вы написали.",
+        "/remove_bad_word": "Удаляет плохое слово из базы данных.",
+        "/remove_streamer": "Удаляет стримера из базы данных.",
+        "/rps": "Играет с вами в камень-ножницы-бумага.",
+        "/unban": "Разбанивает пользователя по id.",
+        "/unmute": "Возвращает возможность писать в чат выбранному участнику сервера.",
+        "/warn": "Выдаёт предупреждение пользователю.",
+        "/warns": "Показывает список предупреждений пользователя."
+    }
+
+    sorted_commands = dict(sorted(commands_dict.items()))
+
+    embed_commands = nextcord.Embed(
+        title="Список всех команд",
+        description="Список всех команд в алфавитном порядке.",
+        color=0x223eff
+    )
+
+    for command, description in sorted_commands.items():
+        embed_commands.add_field(name=command, value=description, inline=False)
+
     await interaction.response.send_message(embed=embed_commands, ephemeral=True)
 
+async def get_dominant_color(url: str) -> int:
+    # Получаем изображение аватара
+    async with aiohttp.ClientSession() as session:
+        async with session.get(url) as resp:
+            if resp.status == 200:
+                image_data = await resp.read()
+                # Загружаем изображение и извлекаем цвет
+                image = Image.open(BytesIO(image_data))
+                color_thief = ColorThief(BytesIO(image_data))
+                # Извлекаем основной цвет
+                dominant_color = color_thief.get_color(quality=1)
+                return nextcord.Color.from_rgb(*dominant_color)
+            else:
+                return 0x223eff
 
 @bot.slash_command(description="Показывает ваш уровень и количество сообщений, которые вы написали.")
 async def profile(interaction: nextcord.Interaction):
-    global lv_multiplier
-    lvl_cursor.execute(f"SELECT id FROM users WHERE id = {interaction.user.id}")
+    # Получаем данные пользователя из базы данных
+    lvl_cursor.execute("SELECT lvl, messages FROM users WHERE id = ?", (interaction.user.id,))
     result = lvl_cursor.fetchone()
+
     if result is None:
-        lvl_cursor.execute(
-            f"INSERT INTO users VALUES ({interaction.user.id}, '{interaction.user.name}', 0, 0)")
+        # Если пользователя нет в базе данных, добавляем его
+        lvl_cursor.execute("INSERT INTO users (id, name, messages, lvl) VALUES (?, ?, 0, 0)",
+                           (interaction.user.id, interaction.user.name))
         lvl_db.commit()
         await interaction.response.send_message("Вы ещё не написали ни одного сообщения!", ephemeral=True)
-    else:
-        lvl_cursor.execute(f"SELECT lvl FROM users WHERE id = {interaction.user.id}")
-        result = lvl_cursor.fetchone()
-        lvl = result[0]
-        lv_multiplier = (lvl * (lvl + 1)) // 2
-        lvl_cursor.execute(f"SELECT messages FROM users WHERE id = {interaction.user.id}")
-        result = lvl_cursor.fetchone()
-        messages = result[0]
-        embed = nextcord.Embed(title=f"Профиль {interaction.user.name}", description=f"Уровень: {lvl}\n"
-                                                                                     f"Всего ообщений: "
-                                                                                     f"{(10 * lv_multiplier) + messages}"
-                                                                                     f"\nСообщений до следующего "
-                                                                                     f"уровня: "
-                                                                                     f"{10 * (lvl + 1) - messages}",
-                               color=0x223eff)
-        embed.set_thumbnail(url=interaction.user.avatar.url)
-        await interaction.response.send_message(embed=embed, ephemeral=True)
+        return
 
+    # Если пользователь есть в базе данных, извлекаем его данные
+    lvl, messages = result
+    lv_multiplier = (lvl * (lvl + 1)) // 2
+    total_messages = (10 * lv_multiplier) + messages
+    messages_to_next_level = 10 * (lvl + 1) - messages
 
-@bot.slash_command(description="Играет с вами в подбрасывание монетки.")
-async def coinflip(interaction: nextcord.Interaction):
-    choices = ["орёл", "решка"]
-    bot_choice = random.choice(choices)
-    await interaction.response.send_message(f"Выпало: {bot_choice}", ephemeral=True)
+    # Получаем доминирующий цвет аватара
+    avatar_url = interaction.user.avatar.url
+    accent_color = await get_dominant_color(avatar_url)
+
+    # Создаем и отправляем сообщение с профилем
+    embed = nextcord.Embed(
+        title=f"Профиль {interaction.user.name}",
+        description=f"Уровень: {lvl}\n"
+                    f"Всего сообщений: {total_messages}\n"
+                    f"Сообщений до следующего уровня: {messages_to_next_level}",
+        color=accent_color
+    )
+    embed.set_thumbnail(url=avatar_url)
+    await interaction.response.send_message(embed=embed, ephemeral=True)
 
 
 @bot.slash_command(description="Показывает таблицу лидеров по уромню и количеству сообщений с их количеством"
