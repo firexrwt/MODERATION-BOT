@@ -1,8 +1,9 @@
 import requests
 import json
-
+from urllib.parse import quote
 
 config = json.load(open('config.json'))
+
 
 class Stream:
     def __init__(self, title, streamer, game, thumbnail_url):
@@ -11,6 +12,12 @@ class Stream:
         self.game = game
         self.thumbnail_url = thumbnail_url
 
+    def __str__(self):
+        return (f"Title: {self.title}\n"
+                f"Streamer: {self.streamer}\n"
+                f"Game: {self.game}\n"
+                f"Thumbnail URL: {self.thumbnail_url}")
+
 
 def getOAuthToken():
     body = {
@@ -18,38 +25,44 @@ def getOAuthToken():
         "client_secret": config['client_secret'],
         "grant_type": "client_credentials"
     }
-    r = requests.post('https://id.twitch.tv/oauth2/token', body)
+    r = requests.post('https://id.twitch.tv/oauth2/token', json=body)
 
-    # data output
+    if r.status_code != 200:
+        raise Exception(f"Failed to get OAuth token: {r.status_code} {r.text}")
+
     keys = r.json()
     return keys['access_token']
 
 
 def checkIfLive(channel):
-    # Calling the twitch api to check if a specific is live
-    url = "https://api.twitch.tv/helix/streams?user_login=" + channel
+    encoded_channel = quote(channel)  # Кодируем имя канала
+    url = f"https://api.twitch.tv/helix/streams?user_login={encoded_channel}"
     token = getOAuthToken()
 
     HEADERS = {
         'Client-ID': config['client_id'],
-        'Authorization': 'Bearer ' + token
+        'Authorization': f'Bearer {token}'
     }
 
     try:
-
         req = requests.get(url, headers=HEADERS)
+
+        if req.status_code != 200:
+            raise Exception(f"Failed to get stream data: {req.status_code} {req.text}")
 
         res = req.json()
 
-        if len(res['data']) > 0:  # the twitch channel is live
+        if 'data' in res and len(res['data']) > 0:  # Проверяем, что стример онлайн
             data = res['data'][0]
-            title = data['title']
-            streamer = data['user_name']
-            game = data['game_name']
-            thumbnail_url = data['thumbnail_url']
+            title = data.get('title', 'No Title')
+            streamer = data.get('user_name', 'No Streamer')
+            game = data.get('game_name', 'No Game')
+            # Заменяем переменные в URL на фиксированные размеры
+            thumbnail_url = data.get('thumbnail_url', 'No Thumbnail').replace('{width}', '1920').replace('{height}',
+                                                                                                         '1080')
             stream = Stream(title, streamer, game, thumbnail_url)
             return stream
         else:
             return "OFFLINE"
     except Exception as e:
-        return "An error occured: " + str(e)
+        return f"An error occurred: {str(e)}"

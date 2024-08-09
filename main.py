@@ -683,20 +683,20 @@ async def streamers(interaction: nextcord.Interaction):
 
 @tasks.loop(seconds=60)
 async def twitchNotifications():
-    # this function takes a streamer from the database and checks, if he is live
-    global streamers_list
     for i in bot.guilds:
-        streamers_cursor.execute('SELECT * FROM streamers')
+        streamers_cursor.execute('SELECT nickname FROM streamers')
         streamers_list = streamers_cursor.fetchall()
         for x in streamers_list:
-            stream = checkIfLive(x[0])
+            streamer_nickname = x[0]
+            stream = checkIfLive(streamer_nickname)
+
             if stream != "OFFLINE":
-                streamers_cursor.execute('SELECT status from streamers WHERE nickname = "%s"' % stream.streamer)
+                streamers_cursor.execute('SELECT status FROM streamers WHERE nickname = ?', (stream.streamer,))
                 result = streamers_cursor.fetchone()
-                if result[0] == "OFFLINE" or result[0] is None:
+                if result is None or result[0] == "OFFLINE":
                     if stream.game == "Just Chatting":
-                        streamers_cursor.execute('UPDATE streamers SET status = "LIVE" WHERE nickname = "%s"'
-                                                 % stream.streamer)
+                        streamers_cursor.execute('UPDATE streamers SET status = "LIVE" WHERE nickname = ?',
+                                                 (stream.streamer,))
                         notification = nextcord.Embed(
                             title="Twitch",
                             description=f"Заходите на стрим {stream.streamer} прямо "
@@ -709,12 +709,11 @@ async def twitchNotifications():
                             value="Пока просто общаемся!"
                         )
                         notification.set_thumbnail(url=stream.thumbnail_url)
-                        channel = bot.get_channel(notif_channel)
+                        channel = bot.get_channel(notif_channel)  # Укажите правильный ID канала
                         await channel.send("@everyone", embed=notification)
                     else:
-                        streamers_cursor.execute('UPDATE streamers SET status = "LIVE" WHERE nickname = "%s"'
-                                                 % stream.streamer)
-
+                        streamers_cursor.execute('UPDATE streamers SET status = "LIVE" WHERE nickname = ?',
+                                                 (stream.streamer,))
                         notification = nextcord.Embed(
                             title="Twitch",
                             description=f"Заходите на стрим {stream.streamer} прямо "
@@ -727,14 +726,14 @@ async def twitchNotifications():
                             value=f"Стримим {stream.game}!"
                         )
                         notification.set_thumbnail(url=stream.thumbnail_url)
-                        channel = bot.get_channel(notif_channel)
+                        channel = bot.get_channel(notif_channel)  # Укажите правильный ID канала
                         await channel.send("@everyone", embed=notification)
             else:
-                streamers_cursor.execute('SELECT status from streamers WHERE nickname = "%s"' % x[0])
+                streamers_cursor.execute('SELECT status FROM streamers WHERE nickname = ?', (streamer_nickname,))
                 result = streamers_cursor.fetchone()
-                if result[0] == "LIVE":
-                    streamers_cursor.execute('UPDATE streamers SET status = "OFFLINE" WHERE nickname = "%s"'
-                                             % x[0])
+                if result is not None and result[0] == "LIVE":
+                    streamers_cursor.execute('UPDATE streamers SET status = "OFFLINE" WHERE nickname = ?',
+                                             (streamer_nickname,))
 
 
 @bot.slash_command(description="Удаляет все сообщения конкретного юзера в канале.")
