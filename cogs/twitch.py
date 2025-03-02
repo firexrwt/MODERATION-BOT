@@ -11,16 +11,18 @@ class TwitchCog(commands.Cog):
     def cog_unload(self):
         self.twitch_notifications_task.cancel()
 
-    @tasks.loop(seconds=60)
+    @tasks.loop(seconds=120)
     async def twitch_notifications_task(self):
         cur = self.bot.db_streamers.cursor()
         cur.execute('SELECT nickname FROM streamers')
         streamers_list = cur.fetchall()
         for (streamer_nickname,) in streamers_list:
             stream = checkIfLive(streamer_nickname)
+            print(str(stream))
             if stream != "OFFLINE":
                 cur.execute('SELECT status FROM streamers WHERE nickname = ?', (stream.streamer,))
                 result = cur.fetchone()
+                print(result[0])
                 if result is None or result[0] == "OFFLINE":
                     cur.execute('UPDATE streamers SET status = "LIVE" WHERE nickname = ?', (stream.streamer,))
                     self.bot.db_streamers.commit()
